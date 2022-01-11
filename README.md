@@ -55,9 +55,17 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 
 # Limitations
 
-* The new 65C816 device is largely untested.  I plan to update it as I work on supporting hardware and code.  Use at your own risk.
+1. The new 65C816 device is largely untested.  I plan to update it as I work on supporting hardware and code.  Use at your own risk.  Some know issues:
 
-* While Liara Forth runs in py65 with the new 65C816 device, it isn't hard to make it crash.  I believe this is due to my code, rather than Liara Forth, even though it is marked as an ALPHA version.
+* ROL and ROR haven't been updated for a 16 bit accumulator.
+* Extra cycle counts haven't been considered for any new to 65816 opcodes.
+* ADC and SBC in decimal mode are likely invalid in 16 bit.
+* Native mode hasn't been tested outside of bank 0.  Assume it will fail for this until it is tested.  Currently only 3 banks of memory are modeled, by py65 default, but this can easily be changed.
+* The simulation is meant to emulate the actual W65C816.  Modelling so far has been based on the 65816 Programming Manual only.  I intend to test at least some code against the W65C265SXB development board.
+* Currently no way to break to the py65 monitor.
+* Register wrapping of Direct page addressing modes need tested.
 
-* I've successfully run a non-interrupt version of my own 6502 Forth in the new 65C816 device in emulation mode.  This isn't surprising since much of the code comes from py65 6502 and 65C02 devices.  I expect an interrupt version of it will run as well, but I haven't tested this.  I expect that many 6502 programs will run in emulation mode.  Note however, that there are differences between the 65C816 operating in emulation mode and the 6502/65C02 that could cause problems with your program.
+2. While Liara Forth runs in py65 with the new 65C816 device, it isn't hard to make it crash.  I believe this is due to my code, rather than Liara Forth, even though it is marked as an ALPHA version.  Liara Forth runs entirely in bank 0.  There is no way to break to the monitor since Liara Forth was designed to run on hardware only.  It can only be ended with a control-C.
+
+3. I've successfully run a non-interrupt version of my own 6502 Forth in the new 65C816 device in emulation mode.  This isn't surprising since much of the code comes from py65 6502 and 65C02 devices.  I expect an interrupt version of it will run as well, but I haven't tested this.  I expect that many 6502 programs will run in emulation mode.  Note however, that there are differences between the 65C816 operating in emulation mode and the 6502/65C02 that could cause problems with your program.
 
