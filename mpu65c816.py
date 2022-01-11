@@ -496,29 +496,45 @@ class MPU:
             tbyte = self.a
         else:
             addr = x()
-            tbyte = self.ByteAt(addr)
+            if self.p & self.MS:
+                tbyte = self.ByteAt(addr)
+            else:
+                tbyte = self.WordAt(addr)
 
         self.p &= ~(self.CARRY | self.NEGATIVE | self.ZERO)
 
-        if tbyte & self.NEGATIVE:
-            self.p |= self.CARRY
-        tbyte = (tbyte << 1) & self.byteMask
+        if self.p & self.MS:
+            if tbyte & self.NEGATIVE:
+                self.p |= self.CARRY
+            tbyte = (tbyte << 1) & self.byteMask
+        else:
+            if (tbyte >> self.BYTE_WIDTH) & self.NEGATIVE:
+                self.p |= self.CARRY
+            tbyte = (tbyte << 1) & self.addrMask
 
         if tbyte:
-            self.p |= tbyte & self.NEGATIVE
+            if tbyte & self.NEGATIVE:
+                self.p |= tbyte & self.NEGATIVE
+            else:
+                self.p |= (tbyte >> self.BYTE_WIDTH) & self.NEGATIVE
         else:
             self.p |= self.ZERO
 
         if x is None:
             self.a = tbyte
         else:
-            self.memory[addr] = tbyte
+            if self.p & self.MS:
+                self.memory[addr] = tbyte
+            else:
+                self.memory[addr] = tbyte & self.byteMask
+                self.memory[addr+1] = tbyte >> self.BYTE_WIDTH
 
     def opBIT(self, x):
         if self.p & self.MS:
             tbyte = self.ByteAt(x())
         else:
             tbyte = self.WordAt(x())
+            
         self.p &= ~(self.ZERO | self.NEGATIVE | self.OVERFLOW)
         if (self.a & tbyte) == 0:
             self.p |= self.ZERO
@@ -527,32 +543,17 @@ class MPU:
         else:
             self.p |= (tbyte >> self.BYTE_WIDTH) & (self.NEGATIVE | self.OVERFLOW)
 
-    def opCMP(self, get_address):
-        if self.p & self.MS:
-            tbyte = self.ByteAt(get_address())
+    def opCMP(self, addr, register_value, bit_flag):
+        if self.p & bit_flag:
+            tbyte = self.ByteAt(addr())
         else:
-            tbyte = self.WordAt(get_address())
-        self.p &= ~(self.CARRY | self.ZERO | self.NEGATIVE)
-        if self.a == tbyte:
-            self.p |= self.CARRY | self.ZERO
-        elif self.a > tbyte:
-            self.p |= self.CARRY
-        if self.p & self.MS:
-            self.p |= (self.a - tbyte) & self.NEGATIVE
-        else:
-            self.p |= ((self.a - tbyte) >> self.BYTE_WIDTH) & self.NEGATIVE
-
-    def opCMPR(self, get_address, register_value):
-        if self.p & self.IRS:
-            tbyte = self.ByteAt(get_address())
-        else:
-            tbyte = self.WordAt(get_address())
+            tbyte = self.WordAt(addr())
         self.p &= ~(self.CARRY | self.ZERO | self.NEGATIVE)
         if register_value == tbyte:
             self.p |= self.CARRY | self.ZERO
         elif register_value > tbyte:
             self.p |= self.CARRY
-        if self.p & self.IRS:
+        if self.p & bit_flag:
             self.p |= (register_value - tbyte) & self.NEGATIVE
         else:
             self.p |= ((register_value - tbyte) >> self.BYTE_WIDTH) & self.NEGATIVE
@@ -658,7 +659,10 @@ class MPU:
             tbyte = self.a
         else:
             addr = x()
-            tbyte = self.ByteAt(addr)
+            if self.p & self.MS:
+                tbyte = self.ByteAt(addr)
+            else:
+                tbyte = self.WordAt(addr)
 
         self.p &= ~(self.CARRY | self.NEGATIVE | self.ZERO)
         self.p |= tbyte & 1
@@ -672,7 +676,11 @@ class MPU:
         if x is None:
             self.a = tbyte
         else:
-            self.memory[addr] = tbyte
+            if self.p & self.MS:
+                self.memory[addr] = tbyte
+            else:
+                self.memory[addr] = tbyte & self.byteMask
+                self.memory[addr+1] = tbyte >> self.BYTE_WIDTH
 
     def opMVB(self, inc):
         # X is source, Y is dest, A is bytes to move - 1
@@ -707,55 +715,90 @@ class MPU:
             self.FlagsNZWord(self.a)
 
     def opROL(self, x):
-        # *** TODO: needs work ***
         if x is None:
             tbyte = self.a
         else:
             addr = x()
-            tbyte = self.ByteAt(addr)
+            if self.p & self.MS:
+                tbyte = self.ByteAt(addr)
+            else:
+                tbyte = self.WordAt(addr)
 
         if self.p & self.CARRY:
-            if tbyte & self.NEGATIVE:
-                pass
+            if self.p & self.MS:
+                if tbyte & self.NEGATIVE:
+                    pass
+                else:
+                    self.p &= ~self.CARRY
             else:
-                self.p &= ~self.CARRY
+                if (tbyte >> self.BYTE_WIDTH) & self.NEGATIVE:
+                    pass
+                else:
+                    self.p &= ~self.CARRY
+
             tbyte = (tbyte << 1) | 1
         else:
-            if tbyte & self.NEGATIVE:
-                self.p |= self.CARRY
+            if self.p & self.MS:
+                if tbyte & self.NEGATIVE:
+                    self.p |= self.CARRY
+            else:
+                if (tbyte >> self.BYTE_WIDTH) & self.NEGATIVE:
+                    self.p |= self.CARRY
             tbyte = tbyte << 1
-        tbyte &= self.byteMask
-        self.FlagsNZ(tbyte)
+
+        if self.p & self.MS:
+            tbyte &= self.byteMask
+            self.FlagsNZ(tbyte)
+        else:
+            tbyte &= self.addrMask
+            self.FlagsNZWord(tbyte)
 
         if x is None:
             self.a = tbyte
         else:
-            self.memory[addr] = tbyte
+            if self.p & self.MS:
+                self.memory[addr] = tbyte & self.byteMask
+            else:
+                self.memory[addr] = tbyte & self.byteMask
+                self.memory[addr+1] = tbyte >> self.byteMask
 
     def opROR(self, x):
-        # *** TODO: needs work ***
         if x is None:
             tbyte = self.a
         else:
             addr = x()
-            tbyte = self.ByteAt(addr)
+            if self.p & self.MS:
+                tbyte = self.ByteAt(addr)
+            else:
+                tbyte = self.WordAt(addr)
 
         if self.p & self.CARRY:
             if tbyte & 1:
                 pass
             else:
                 self.p &= ~self.CARRY
-            tbyte = (tbyte >> 1) | self.NEGATIVE
+            if self.p & self.MS:
+                tbyte = (tbyte >> 1) | self.NEGATIVE
+            else:
+                tbyte = (tbyte >> 1) | (self.NEGATIVE << self.BYTE_WIDTH)
         else:
             if tbyte & 1:
                 self.p |= self.CARRY
             tbyte = tbyte >> 1
-        self.FlagsNZ(tbyte)
+
+        if self.p & self.MS:
+            self.FlagsNZ(tbyte)
+        else:
+            self.FlagsNZWord(tbyte)
 
         if x is None:
             self.a = tbyte
         else:
-            self.memory[addr] = tbyte
+            if self.p & self.MS:
+                self.memory[addr] = tbyte
+            else:
+                self.memory[addr] = tbyte
+                self.memory[addr+1] = tbyte >> self.byteMask
 
     def opSBC(self, x):
         if self.p & self.MS:
@@ -2018,12 +2061,12 @@ class MPU:
 
     @instruction(name="CPY", mode="imm", cycles=2)
     def inst_0xc0(self):
-        self.opCMPR(self.ImmediateAddr, self.y)
+        self.opCMP(self.ImmediateAddr, self.y, self.IRS)
         self.incPC(2 - ((self.p & self.IRS)>>4))
 
     @instruction(name="CMP", mode="dix", cycles=6)
     def inst_0xc1(self):
-        self.opCMP(self.DirectPageIndirectXAddr)
+        self.opCMP(self.DirectPageIndirectXAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="REP", mode="imm", cycles=3) # new to 65816
@@ -2041,17 +2084,17 @@ class MPU:
 
     @instruction(name="CMP", mode="str", cycles=4) # new to 65816
     def inst_0xc3(self):
-        self.opCMP(self.StackRelAddr)
+        self.opCMP(self.StackRelAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="CPY", mode="dpg", cycles=3)
     def inst_0xc4(self):
-        self.opCMPR(self.DirectPageAddr, self.y)
+        self.opCMP(self.DirectPageAddr, self.y, self.IRS)
         self.incPC()
 
     @instruction(name="CMP", mode="dpg", cycles=3)
     def inst_0xc5(self):
-        self.opCMP(self.DirectPageAddr)
+        self.opCMP(self.DirectPageAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="DEC", mode="dpg", cycles=5)
@@ -2061,7 +2104,7 @@ class MPU:
 
     @instruction(name="CMP", mode="dil", cycles=6) # new to 65816
     def inst_0xc7(self):
-        self.opCMP(self.DirectPageIndirectLongAddr)
+        self.opCMP(self.DirectPageIndirectLongAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="INY", mode="imp", cycles=2)
@@ -2076,7 +2119,7 @@ class MPU:
 
     @instruction(name="CMP", mode="imm", cycles=2)
     def inst_0xc9(self):
-        self.opCMP(self.ImmediateAddr)
+        self.opCMP(self.ImmediateAddr, self.a, self.MS)
         self.incPC(2 - ((self.p & self.MS)>>5))
 
     @instruction(name="DEX", mode="imp", cycles=2)
@@ -2095,12 +2138,12 @@ class MPU:
 
     @instruction(name="CPY", mode="abs", cycles=4)
     def inst_0xcc(self):
-        self.opCMPR(self.AbsoluteAddr, self.y)
+        self.opCMP(self.AbsoluteAddr, self.y, self.IRS)
         self.incPC(2)
 
     @instruction(name="CMP", mode="abs", cycles=4)
     def inst_0xcd(self):
-        self.opCMP(self.AbsoluteAddr)
+        self.opCMP(self.AbsoluteAddr, self.a, self.MS)
         self.incPC(2)
 
     @instruction(name="DEC", mode="abs", cycles=3)
@@ -2110,7 +2153,7 @@ class MPU:
 
     @instruction(name="CMP", mode="abl", cycles=5) # new to 65816
     def inst_0xcf(self):
-        self.opCMP(self.AbsoluteLongAddr)
+        self.opCMP(self.AbsoluteLongAddr, self.a, self.MS)
         self.incPC(3)
 
     @instruction(name="BNE", mode="pcr", cycles=2, extracycles=2)
@@ -2119,17 +2162,17 @@ class MPU:
 
     @instruction(name="CMP", mode="diy", cycles=5, extracycles=1)
     def inst_0xd1(self):
-        self.opCMP(self.DirectPageIndirectYAddr)
+        self.opCMP(self.DirectPageIndirectYAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="CMP", mode='dpi', cycles=5)
     def inst_0xd2(self):
-        self.opCMP(self.DirectPageIndirectAddr)
+        self.opCMP(self.DirectPageIndirectAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="CMP", mode="siy", cycles=7) # new to 65816
     def inst_0xd3(self):
-        self.opCMP(self.StackRelIndirectYAddr)
+        self.opCMP(self.StackRelIndirectYAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="PEI", mode="ski", cycles=6) # new to 65816
@@ -2140,7 +2183,7 @@ class MPU:
 
     @instruction(name="CMP", mode="dpx", cycles=4)
     def inst_0xd5(self):
-        self.opCMP(self.DirectPageXAddr)
+        self.opCMP(self.DirectPageXAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="DEC", mode="dpx", cycles=6)
@@ -2150,7 +2193,7 @@ class MPU:
 
     @instruction(name="CMP", mode="dly", cycles=6) # new to 65816
     def inst_0xd7(self):
-        self.opCMP(self.DirectPageIndirectLongYAddr)
+        self.opCMP(self.DirectPageIndirectLongYAddr, self.a, self.MS)
         self.incPC()
 
     @instruction(name="CLD", mode="imp", cycles=2)
@@ -2159,7 +2202,7 @@ class MPU:
 
     @instruction(name="CMP", mode="aby", cycles=4, extracycles=1)
     def inst_0xd9(self):
-        self.opCMP(self.AbsoluteYAddr)
+        self.opCMP(self.AbsoluteYAddr, self.a, self.MS)
         self.incPC(2)
 
     @instruction(name="PHX", mode="stk", cycles=3)
@@ -2188,7 +2231,7 @@ class MPU:
 
     @instruction(name="CMP", mode="abx", cycles=4, extracycles=1)
     def inst_0xdd(self):
-        self.opCMP(self.AbsoluteXAddr)
+        self.opCMP(self.AbsoluteXAddr, self.a, self.MS)
         self.incPC(2)
 
     @instruction(name="DEC", mode="abx", cycles=7)
@@ -2198,12 +2241,12 @@ class MPU:
 
     @instruction(name="CMP", mode="alx", cycles=5) # new to 65816
     def inst_0xdf(self):
-        self.opCMP(self.AbsoluteLongXAddr)
+        self.opCMP(self.AbsoluteLongXAddr, self.a, self.MS)
         self.incPC(3)
 
     @instruction(name="CPX", mode="imm", cycles=2)
     def inst_0xe0(self):
-        self.opCMPR(self.ImmediateAddr, self.x)
+        self.opCMP(self.ImmediateAddr, self.x, self.IRS)
         self.incPC(2 - ((self.p & self.IRS)>>4))
 
     @instruction(name="SBC", mode="dix", cycles=6)
@@ -2236,7 +2279,7 @@ class MPU:
 
     @instruction(name="CPX", mode="dpg", cycles=3)
     def inst_0xe4(self):
-        self.opCMPR(self.DirectPageAddr, self.x)
+        self.opCMP(self.DirectPageAddr, self.x, self.IRS)
         self.incPC()
 
     @instruction(name="SBC", mode="dpg", cycles=3)
@@ -2291,7 +2334,7 @@ class MPU:
 
     @instruction(name="CPX", mode="abs", cycles=4)
     def inst_0xec(self):
-        self.opCMPR(self.AbsoluteAddr, self.x)
+        self.opCMP(self.AbsoluteAddr, self.x, self.IRS)
         self.incPC(2)
 
     @instruction(name="SBC", mode="abs", cycles=4)
