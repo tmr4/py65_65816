@@ -57,7 +57,7 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 
 1. The new 65C816 device is largely untested.  I plan to update it as I work on supporting hardware and code.  Use at your own risk.  Some know issues:
 
-* ROL and ROR haven't been updated for a 16 bit accumulator.
+* FIXED: ROL and ROR haven't been updated for a 16 bit accumulator.
 * Extra cycle counts haven't been considered for any new to 65816 opcodes.
 * ADC and SBC in decimal mode are likely invalid in 16 bit.
 * Native mode hasn't been tested outside of bank 0.  Assume it will fail for this until it is tested.  Currently only 3 banks of memory are modeled, by py65 default, but this can easily be changed.
@@ -73,7 +73,9 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 
 * Initial commit: January 11, 2022
 * Successfully tested my 65C02 Forth in emulation mode
-* Was able to run Liara Forth in native mode in block 0.  Many words cause it to crash (likely due to one of the limitations listed above).
+* Was able to run Liara Forth in native mode in block 0.  
+  * FIXED: (Many words cause it to crash (likely due to one of the limitations listed above).)
+  * Currently all numbers print out as 0.  Unclear why.
 
 # Next Steps
 
