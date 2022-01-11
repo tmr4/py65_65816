@@ -69,3 +69,13 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 
 3. I've successfully run a non-interrupt version of my own 6502 Forth in the new 65C816 device in emulation mode.  This isn't surprising since much of the code comes from py65 6502 and 65C02 devices.  I expect an interrupt version of it will run as well, but I haven't tested this.  I expect that many 6502 programs will run in emulation mode.  Note however, that there are differences between the 65C816 operating in emulation mode and the 6502/65C02 that could cause problems with your program.
 
+# Status
+
+* Initial commit: January 11, 2022
+* Successfully tested my 65C02 Forth in emulation mode
+* Was able to run Liara Forth in native mode in block 0.  Many words cause it to crash (likely due to one of the limitations listed above).
+
+# Next Steps
+
+* Resolve simulator issues with running Liara Forth.  I view this as a robust test of the 65816 simulator, other than bank switching, which Liara Forth doesn't handle out of the box.  Some hardware specific Liara Forth features will not work with the simulator (KEY? for example which is hardwired to a W65C265SXB development board specific address indicating whether a key has been pressed).
+* Add native mode unit tests.
