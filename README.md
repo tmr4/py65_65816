@@ -75,7 +75,7 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 * Successfully tested my 65C02 Forth in emulation mode
 * Was able to run Liara Forth in native mode in block 0.  
   * FIXED: (Many words cause it to crash (likely due to one of the limitations listed above).)
-  * Currently all numbers print out as 0.  Unclear why.
+  * Currently all numbers print out as 0.  After verifying that Liara Forth works properly on the W65C265SXB development board, using my debug window (https://github.com/tmr4/py65_debug_window) I tracked the issue down to UM* where the high byte in the high cell of the result is zero (for example $1234 * $1234 = $14b5a90 but my 65816 simulation is yielding $04b5a90).  I couldn't find any obvious errors in my code after examining each line code for the Liara Forth UM*.  I'm ending up with a 24 bit value rather than a 32 bit one, so that may give me a clue to what's happening. 
 
 # Next Steps
 
