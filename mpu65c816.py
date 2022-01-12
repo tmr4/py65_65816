@@ -62,8 +62,8 @@ class MPU:
             return ("%s PC  AC XR YR SP NV-BDIZC\n"
                     "%s: %04x %02x %02x %02x %02x %s")
         else:
-            return ("%s PC  AC XR YR SP NVMXDIZC\n"
-                    "%s: %04x %02x %02x %02x %02x %s")
+            return ("%s PC   AC   XR   YR   SP  NVMXDIZC\n"
+                    "%s: %04x %04x %04x %04x %04x %s")
 
 # *** TODO: ***
     def __repr__(self):
@@ -760,7 +760,7 @@ class MPU:
                 self.memory[addr] = tbyte & self.byteMask
             else:
                 self.memory[addr] = tbyte & self.byteMask
-                self.memory[addr+1] = tbyte >> self.byteMask
+                self.memory[addr+1] = tbyte >> self.BYTE_WIDTH
 
     def opROR(self, x):
         if x is None:
@@ -798,7 +798,7 @@ class MPU:
                 self.memory[addr] = tbyte
             else:
                 self.memory[addr] = tbyte
-                self.memory[addr+1] = tbyte >> self.byteMask
+                self.memory[addr+1] = tbyte >> self.BYTE_WIDTH
 
     def opSBC(self, x):
         if self.p & self.MS:
@@ -2423,7 +2423,7 @@ class MPU:
             self.pSET(self.IRS)
             self.pSET(self.CARRY)
             self.mode = 0
-        elif not self.mode and self.isSet(self.CARRY): # native => emul
+        elif not self.mode and self.isSET(self.CARRY): # native => emul
             self.pSET(self.BREAK)
             self.pSET(self.UNUSED)
             self.pCLR(self.CARRY)
