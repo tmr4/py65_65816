@@ -62,10 +62,10 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 * ADC and SBC in decimal mode are likely invalid in 16 bit.
 * Native mode hasn't been tested outside of bank 0.  Assume it will fail for this until it is tested.  Currently only 3 banks of memory are modeled, by py65 default, but this can easily be changed.
 * The simulation is meant to emulate the actual W65C816.  Modelling so far has been based on the 65816 Programming Manual only.  I intend to test at least some code against the W65C265SXB development board.
-* Currently no way to break to the py65 monitor.
+* Currently no way to break to the py65 monitor.  I've successfully run Liara Forth with a version of my debug window (https://github.com/tmr4/py65_debug_window) without the interrupt code.
 * Register wrapping of Direct page addressing modes need tested.
 
-2. While Liara Forth runs in py65 with the new 65C816 device, it isn't hard to make it crash.  I believe this is due to my code, rather than Liara Forth, even though it is marked as an ALPHA version.  Liara Forth runs entirely in bank 0.  There is no way to break to the monitor since Liara Forth was designed to run on hardware only.  It can only be ended with a control-C.
+2. Liara Forth now runs in py65 with the new 65C816 device, but it hasn't been extensively tested.  Liara Forth runs entirely in bank 0.  There is no way to break to the monitor since Liara Forth was designed to run on hardware only (you can use my debug window with it).  It can only be ended with a control-C.
 
 3. I've successfully run a non-interrupt version of my own 6502 Forth in the new 65C816 device in emulation mode.  This isn't surprising since much of the code comes from py65 6502 and 65C02 devices.  I expect an interrupt version of it will run as well, but I haven't tested this.  I expect that many 6502 programs will run in emulation mode.  Note however, that there are differences between the 65C816 operating in emulation mode and the 6502/65C02 that could cause problems with your program.
 
@@ -75,9 +75,9 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 * Successfully tested my 65C02 Forth in emulation mode
 * Was able to run Liara Forth in native mode in block 0.  
   * FIXED: (Many words cause it to crash (likely due to one of the limitations listed above).)
-  * Currently all numbers print out as 0.  After verifying that Liara Forth works properly on the W65C265SXB development board, using my debug window (https://github.com/tmr4/py65_debug_window) I tracked the issue down to UM* where the high byte in the high cell of the result is zero (for example $1234 * $1234 = $14b5a90 but my 65816 simulation is yielding $04b5a90).  I couldn't find any obvious errors in my code after examining each line code for the Liara Forth UM*.  I'm ending up with a 24 bit value rather than a 32 bit one, so that may give me a clue to what's happening. 
+  * FIXED: Currently all numbers print out as 0.  After verifying that Liara Forth works properly on the W65C265SXB development board, using my debug window (https://github.com/tmr4/py65_debug_window) I tracked the issue down to UM* where the high byte in the high cell of the result is zero (for example $1234 * $1234 = $14b5a90 but my 65816 simulation is yielding $04b5a90).  I couldn't find any obvious errors in my code after examining each line code for the Liara Forth UM*.  I'm ending up with a 24 bit value rather than a 32 bit one, so that may give me a clue to what's happening. Update: turns out I was shifting the high byte by the byte mask ($ffff) instead of the byte width ($08)! Oops.
 
 # Next Steps
 
-* Resolve simulator issues with running Liara Forth.  I view this as a robust test of the 65816 simulator, other than bank switching, which Liara Forth doesn't handle out of the box.  Some hardware specific Liara Forth features will not work with the simulator (KEY? for example which is hardwired to a W65C265SXB development board specific address indicating whether a key has been pressed).
-* Add native mode unit tests.
+* COMPLETED: Resolve simulator issues with running Liara Forth.  I view this as a robust test of the 65816 simulator, other than bank switching, which Liara Forth doesn't handle out of the box.  Some hardware specific Liara Forth features will not work with the simulator (KEY? for example which is hardwired to a W65C265SXB development board specific address indicating whether a key has been pressed).
+* Add native mode unit tests.  Still looking for an easy way to do this.  All of the 65816 testing frameworks I've found so far require an amount of conversion almost equal to modifying the emulation mode tests for native mode.
