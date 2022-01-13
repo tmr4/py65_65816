@@ -47,7 +47,7 @@ The `mpu65c816.py`, `test_mpu65816_Common6502.py` and `test_mpu65816_Common65c02
 
 # Running the 65C816 Unit Tests
 
-You can run the unit tests with `python -m unittest test_mpu65c816.py`.  The 65C816 simulation passes the py65 6502- and 65C02-based test (507 in total) in emulation mode.  Some of tests were modified to run properly with the new device.  I still have to create the tests for native mode operations (not a small task).  I expect these to take some time and I expect these will turn up many errors in my code.
+You can run the unit tests with `python -m unittest test_mpu65c816_emulation.py` to run 65816 emulation mode tests.  Use `python -m unittest test_mpu65c816_native_8.py` to run the 65816 native mode 8-bit tests.  The 65C816 simulation passes the py65 6502- and 65C02-based test (507 in total) in emulation mode.  Some of tests were modified to run properly with the new device.  I still have to create the tests for native mode operations (not a small task).  I expect these to take some time and I expect these will turn up many errors in my code.
 
 # Testing the 65C816 Simulation with Liara Forth
 
