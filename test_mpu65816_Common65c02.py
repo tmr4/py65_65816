@@ -431,18 +431,6 @@ class Common65C02Tests:
         self.assertEqual(0x01, mpu.a)
         self.assertEqual(0x00, mpu.memory[0x0010 + mpu.x])
 
-    # BRK
-
-    def test_brk_clears_decimal_flag(self):
-        mpu = self._make_mpu()
-        mpu.p = mpu.DECIMAL
-        # $C000 BRK
-        mpu.memory[0xC000] = 0x00
-        mpu.pc = 0xC000
-        mpu.step()
-        self.assertEqual(mpu.BREAK, mpu.p & mpu.BREAK)
-        self.assertEqual(0, mpu.p & mpu.DECIMAL)
-
     # CMP Zero Page, Indirect
 
     def test_cmp_zpi_sets_z_flag_if_equal(self):
@@ -619,62 +607,6 @@ class Common65C02Tests:
         self.assertEqual(0x83, mpu.a)
         self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
         self.assertEqual(0, mpu.p & mpu.ZERO)
-
-    # PHX
-
-    def test_phx_pushes_x_and_updates_sp(self):
-        mpu = self._make_mpu()
-        mpu.x = 0xAB
-        # $0000 PHX
-        mpu.memory[0x0000] = 0xDA
-        mpu.step()
-        self.assertEqual(0x0001, mpu.pc)
-        self.assertEqual(0xAB, mpu.x)
-        self.assertEqual(0xAB, mpu.memory[0x01FF])
-        self.assertEqual(0xFE, mpu.sp)
-        self.assertEqual(3, mpu.processorCycles)
-
-    # PHY
-
-    def test_phy_pushes_y_and_updates_sp(self):
-        mpu = self._make_mpu()
-        mpu.y = 0xAB
-        # $0000 PHY
-        mpu.memory[0x0000] = 0x5A
-        mpu.step()
-        self.assertEqual(0x0001, mpu.pc)
-        self.assertEqual(0xAB, mpu.y)
-        self.assertEqual(0xAB, mpu.memory[0x01FF])
-        self.assertEqual(0xFE, mpu.sp)
-        self.assertEqual(3, mpu.processorCycles)
-
-    # PLX
-
-    def test_plx_pulls_top_byte_from_stack_into_x_and_updates_sp(self):
-        mpu = self._make_mpu()
-        # $0000 PLX
-        mpu.memory[0x0000] = 0xFA
-        mpu.memory[0x01FF] = 0xAB
-        mpu.sp = 0xFE
-        mpu.step()
-        self.assertEqual(0x0001, mpu.pc)
-        self.assertEqual(0xAB,   mpu.x)
-        self.assertEqual(0xFF,   mpu.sp)
-        self.assertEqual(4, mpu.processorCycles)
-
-    # PLY
-
-    def test_ply_pulls_top_byte_from_stack_into_y_and_updates_sp(self):
-        mpu = self._make_mpu()
-        # $0000 PLY
-        mpu.memory[0x0000] = 0x7A
-        mpu.memory[0x01FF] = 0xAB
-        mpu.sp = 0xFE
-        mpu.step()
-        self.assertEqual(0x0001, mpu.pc)
-        self.assertEqual(0xAB,   mpu.y)
-        self.assertEqual(0xFF,   mpu.sp)
-        self.assertEqual(4, mpu.processorCycles)
 
     # STA Zero Page, Indirect
 

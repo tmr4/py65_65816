@@ -110,14 +110,18 @@ class MPU:
     def irq(self):
         # triggers a normal IRQ
         # this is very similar to the BRK instruction
-        # *** TODO: needs updated for 65816, see:
-        # https://softpixel.com/~cwright/sianse/docs/65816NFO.HTM#7.00
-        # ***
         if self.p & self.INTERRUPT:
             return
+
+        if self.mode:
+            self.p &= ~self.BREAK
+            self.p | self.UNUSED
+        else:
+            self.stPush(self.pbr)
+
         self.stPushWord(self.pc)
-        self.p &= ~self.BREAK
-        self.stPush(self.p | self.UNUSED)
+        self.stPush(self.p)
+
         self.p |= self.INTERRUPT
         self.pbr = 0
         self.pc = self.WordAt(self.IRQ[self.mode])
@@ -126,9 +130,15 @@ class MPU:
     def nmi(self):
         # triggers a NMI IRQ in the processor
         # this is very similar to the BRK instruction
+        if self.mode:
+            self.p &= ~self.BREAK
+            self.p | self.UNUSED
+        else:
+            self.stPush(self.pbr)
+
         self.stPushWord(self.pc)
-        self.p &= ~self.BREAK
-        self.stPush(self.p | self.UNUSED)
+        self.stPush(self.p)
+
         self.p |= self.INTERRUPT
         self.pbr = 0
         self.pc = self.WordAt(self.NMI[self.mode])
@@ -935,7 +945,7 @@ class MPU:
     @instruction(name="BRK", mode="stk", cycles=7)
     def inst_0x00(self):
         if not self.mode:
-            self.stPushByte(self.pbr)
+            self.stPush(self.pbr)
 
         # pc has already been increased one
         # increment for optional signature byte
@@ -950,7 +960,10 @@ class MPU:
 
         self.p |= self.INTERRUPT
         self.pbr = 0
-        self.pc = self.WordAt(self.IRQ[self.mode])
+        if self.mode:
+            self.pc = self.WordAt(self.IRQ[self.mode])
+        else:
+            self.pc = self.WordAt(self.BRK)
 
         # 65C816 clears decimal flag, NMOS 6502 does not
         self.p &= ~self.DECIMAL
@@ -964,7 +977,7 @@ class MPU:
     def inst_0x02(self):
         # *** TODO: consider consolidating with BRK ***
         if not self.mode:
-            self.stPushByte(self.pbr)
+            self.stPush(self.pbr)
 
         # pc has already been increased one
         # increment for optional signature byte
@@ -1143,7 +1156,7 @@ class MPU:
 
     @instruction(name="JSL", mode="abl", cycles=8) # new to 65816
     def inst_0x22(self):
-        self.stPushByte(self.pbr)
+        self.stPush(self.pbr)
         self.stPushWord((self.pc + 2) & self.addrMask)
         self.pbr = self.ByteAt(self.pc+2)
         self.pc = self.WordAt(self.pc)
@@ -1316,8 +1329,13 @@ class MPU:
 
     @instruction(name="RTI", mode="stk", cycles=6)
     def inst_0x40(self):
-        self.p = (self.stPop() | self.BREAK | self.UNUSED)
-        self.pc = self.stPopWord()
+        if self.mode:
+            self.p = (self.stPop() | self.BREAK | self.UNUSED)
+            self.pc = self.stPopWord()
+        else:
+            self.p = self.stPop()
+            self.pc = self.stPopWord()
+            self.pbr = self.stPop()
 
     @instruction(name="EOR", mode="dix", cycles=6)
     def inst_0x41(self):
@@ -2423,6 +2441,7 @@ class MPU:
             self.pSET(self.IRS)
             self.pSET(self.CARRY)
             self.mode = 0
+            self.sp = 0x100 + self.sp
         elif not self.mode and self.isSET(self.CARRY): # native => emul
             self.pSET(self.BREAK)
             self.pSET(self.UNUSED)
