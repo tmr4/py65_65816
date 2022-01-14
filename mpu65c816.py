@@ -473,8 +473,13 @@ class MPU:
                 tmp = 0
             result = data + self.a + tmp
             self.p &= ~(self.CARRY | self.OVERFLOW | self.NEGATIVE | self.ZERO)
-            if (~(self.a ^ data) & (self.a ^ result)) & self.NEGATIVE:
-                self.p |= self.OVERFLOW
+
+            if self.p & self.MS:
+                if (~(self.a ^ data) & (self.a ^ result)) & self.NEGATIVE:
+                    self.p |= self.OVERFLOW
+            else:
+                if (~(self.a ^ data) & (self.a ^ result)) & (self.NEGATIVE << self.BYTE_WIDTH):
+                    self.p |= self.OVERFLOW
             data = result
             if self.p & self.MS:
                 if data > self.byteMask:
