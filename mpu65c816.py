@@ -1,6 +1,11 @@
 from utils.conversions import itoa
 from utils.devices import make_instruction_decorator
 
+# 65c816
+#   Registers
+#       a: represents both 8 and 16 bit accumulator (the 65816 C register is not modeled separately)
+#       b: only valid in 8 bit mode (otherwise use high byte of a)
+#
 class MPU:
     # vectors
     RESET = 0xfffc
@@ -62,16 +67,19 @@ class MPU:
             return ("%s PC  AC XR YR SP NV-BDIZC\n"
                     "%s: %04x %02x %02x %02x %02x %s")
         else:
-            return ("%s PC   AC   XR   YR   SP  NVMXDIZC\n"
-                    "%s: %04x %04x %04x %04x %04x %s")
+            return ("%s B  K  PC   AC   XR   YR   SP   D    NVMXDIZC\n"
+                    "%s: %02x %02x:%04x %04x %04x %04x %04x %04x %s")
 
 # *** TODO: ***
     def __repr__(self):
         flags = itoa(self.p, 2).rjust(self.BYTE_WIDTH, '0')
-        indent = ' ' * (len(self.name) + 2)
-
-        return self.reprformat() % (indent, self.name, self.pc, self.a,
-                                    self.x, self.y, self.sp, flags)
+        indent = ' ' * (len(self.name) + 1)
+        if self.mode:
+            return self.reprformat() % (indent, self.name, self.pc, self.a,
+                                        self.x, self.y, self.sp, flags)
+        else:
+            return self.reprformat() % (indent, self.name, self.dbr, self.pbr, self.pc,
+                                        self.a, self.x, self.y, self.sp, self.dpr, flags)
 
     def step(self):
         if self.waiting:
@@ -94,7 +102,7 @@ class MPU:
         # a, x and y are full 16 bit registers
         # they must be processed properly when in emulation mode
         self.a = 0
-        self.b = 0
+        self.b = 0 # b is 8 bit and hidden, it is only relevent in 8 bit
         self.x = 0
         self.y = 0
 
@@ -162,6 +170,7 @@ class MPU:
     def OperandByte(self):
         return self.ByteAt(self.OperandAddr())
 
+    # *** TODO: likely these next two need some form of WrapAt
     def OperandWord(self):
         return self.WordAt(self.OperandAddr())
 
@@ -290,13 +299,16 @@ class MPU:
                 self.excycles += 1
         return a2
 
-    def AbsoluteIndirectXAddr(self): # "aix" (2 opcodes)
-        return (self.WordAt(self.pc) + self.x + (self.pbr << self.ADDR_WIDTH)) # & self.addrMask
+    def AbsoluteIndirectAddr(self): # "abi" (1 opcodes)
+        return (self.OperandWord() + (self.pbr << self.ADDR_WIDTH))
 
-    # Absolute Indirect "abi" (1 opcode) and Absolute Indirect Long "ail" (1 opcode) modeled directly in JMP
+    def AbsoluteIndirectXAddr(self): # "aix" (2 opcodes)
+        return (self.OperandWord() + self.x + (self.pbr << self.ADDR_WIDTH)) # & self.addrMask
+
+    # Absolute Indirect Long "ail" (1 opcode) modeled directly in JMP as it has to change pbr
 
     def AbsoluteLongAddr(self): # new to 65816, "abl" (10 opcodes)
-        # JML and JSL handle this mode separately
+        # JML and JSL handle this mode separately as they has to change pbr
         return self.OperandLong()
 
     def AbsoluteLongXAddr(self): # new to 65816, "alx" (8 opcodes)
@@ -349,10 +361,10 @@ class MPU:
         return (self.dbr << self.ADDR_WIDTH) + dpaddr
 
     def DirectPageIndirectLongAddr(self): # new to 65816, "dil" (8 opcodes)
-        dpaddr = (self.dpr + self.OperandByte()) & self.addrMask
-        dpaddr1 = (dpaddr + 1) & self.addrMask
-        dpaddr2 = (dpaddr + 2) & self.addrMask
-        return (dpaddr2 << self.ADDR_WIDTH) + (dpaddr1 << self.BYTE_WIDTH) + dpaddr
+        # *** TODO: check on if need wrap at $ffff (seems likely) ***
+        dpaddr = self.dpr + self.OperandByte()
+        addr = (self.ByteAt(dpaddr + 2) << self.ADDR_WIDTH) + self.WordAt(dpaddr)
+        return addr
 
     def DirectPageIndirectYAddr(self): # "diy" (8 opcodes)
         # *** TODO: verify WrapAt works correctly at $ffff ***
@@ -366,8 +378,11 @@ class MPU:
 
     def DirectPageIndirectLongYAddr(self): # new to 65816, "dly" (8 opcodes)
         # *** TODO: verify WrapAt works correctly at $ffff ***
+#        dpaddr = self.dpr + self.OperandByte()
         dpaddr = self.WrapAt((self.dpr + self.OperandByte()) & self.addrMask)
-        a1 = (self.dbr << self.ADDR_WIDTH) + dpaddr
+#        addr = (self.ByteAt(dpaddr + 2) << self.ADDR_WIDTH) + self.WordAt(dpaddr)
+#        a1 = addr
+        a1 = (self.ByteAt(dpaddr + 2) << self.ADDR_WIDTH) + dpaddr
         a2 = a1 + self.y
         if self.addcycles:
             if (a1 & self.addrBankMask) != (a2 & self.addrBankMask):
@@ -423,6 +438,7 @@ class MPU:
         return (self.sp + self.OperandByte()) & self.addrMask
 
     def StackRelIndirectYAddr(self): # "siy" (8 opcode)
+        # *** TODO: does this need WrapAt? ***
         return (self.dbr << self.ADDR_WIDTH) + self.WordAt((self.sp + self.OperandByte()) & self.addrMask) + self.y
 
     # operations
@@ -600,9 +616,9 @@ class MPU:
             self.a = tbyte
         else:
             if self.p & self.MS:
-                self.memory[addr] = tbyte & 0xff
+                self.memory[addr] = tbyte & self.byteMask
             else:
-                self.memory[addr] = tbyte & 0xff
+                self.memory[addr] = tbyte & self.byteMask
                 self.memory[addr+1] = (tbyte >> self.BYTE_WIDTH)
 
     def opEOR(self, x):
@@ -640,9 +656,9 @@ class MPU:
             self.a = tbyte
         else:
             if self.p & self.MS:
-                self.memory[addr] = tbyte & 0xff
+                self.memory[addr] = tbyte & self.byteMask
             else:
-                self.memory[addr] = tbyte & 0xff
+                self.memory[addr] = tbyte & self.byteMask
                 self.memory[addr+1] = (tbyte >> self.BYTE_WIDTH)
 
     def opLDA(self, x):
@@ -713,12 +729,13 @@ class MPU:
         else:
             self.x &= self.addrMask
             self.y &= self.addrMask
-        self.a -= 1
 
         if self.p & self.MS:
-            self.a &= self.byteMask
-            self.b = self.a
+            c = (self.b << self.BYTE_WIDTH) + self.a - 1
+            self.a = c & self.byteMask
+            self.b = (c >> self.BYTE_WIDTH) & self.byteMask
         else:
+            self.a -= 1
             self.a &= self.addrMask
 
     def opORA(self, x):
@@ -810,9 +827,9 @@ class MPU:
             self.a = tbyte
         else:
             if self.p & self.MS:
-                self.memory[addr] = tbyte
+                self.memory[addr] = tbyte & self.byteMask
             else:
-                self.memory[addr] = tbyte
+                self.memory[addr] = tbyte & self.byteMask
                 self.memory[addr+1] = tbyte >> self.BYTE_WIDTH
 
     def opSBC(self, x):
@@ -918,22 +935,42 @@ class MPU:
             self.memory[addr+1] = 0x00
 
     def opTSB(self, x):
-        address = x()
-        m = self.memory[address]
+        addr = x()
+        if self.p & self.MS:
+            m = self.memory[addr]
+        else:
+            m = (self.memory[addr+1] << self.BYTE_WIDTH) + self.memory[addr]
+
         self.p &= ~self.ZERO
         z = m & self.a
         if z == 0:
             self.p |= self.ZERO
-        self.memory[address] = m | self.a
+
+        r = m | self.a
+        if self.p & self.MS:
+            self.memory[addr] = r
+        else:
+            self.memory[addr] = r & self.byteMask
+            self.memory[addr+1] = (r >> self.BYTE_WIDTH) & self.byteMask
 
     def opTRB(self, x):
-        address = x()
-        m = self.memory[address]
+        addr = x()
+        if self.p & self.MS:
+            m = self.memory[addr]
+        else:
+            m = (self.memory[addr+1] << self.BYTE_WIDTH) + self.memory[addr]
+
         self.p &= ~self.ZERO
         z = m & self.a
         if z == 0:
             self.p |= self.ZERO
-        self.memory[address] = m & ~self.a
+
+        r = m & ~self.a
+        if self.p & self.MS:
+            self.memory[addr] = r
+        else:
+            self.memory[addr] = r & self.byteMask
+            self.memory[addr+1] = (r >> self.BYTE_WIDTH) & self.byteMask
 
     # instructions
 
@@ -1120,7 +1157,7 @@ class MPU:
         if self.p & self.MS:
             # A is 8 bit
             if self.mode:
-                # high byte is set to 1
+                # high byte is forced to 1 elsewhere
                 self.sp = self.a & self.byteMask
             else:
                 # hidden B is transfered
@@ -1152,7 +1189,7 @@ class MPU:
     @instruction(name="JSR", mode="abs", cycles=6)
     def inst_0x20(self):
         self.stPushWord((self.pc + 1) & self.addrMask)
-        self.pc = self.WordAt(self.pc)
+        self.pc = self.OperandWord()
 
     @instruction(name="AND", mode="dix", cycles=6)
     def inst_0x21(self):
@@ -1163,8 +1200,8 @@ class MPU:
     def inst_0x22(self):
         self.stPush(self.pbr)
         self.stPushWord((self.pc + 2) & self.addrMask)
-        self.pbr = self.ByteAt(self.pc+2)
-        self.pc = self.WordAt(self.pc)
+        self.pbr = self.ByteAt(self.pc + 2)
+        self.pc = self.OperandWord()
 
     @instruction(name="AND", mode="str", cycles=4) # new to 65816
     def inst_0x23(self):
@@ -1199,12 +1236,13 @@ class MPU:
         else:
             if p & self.MS != self.p & self.MS:
                 if p & self.MS:
-                    # A 16 => 8, save B, truncate A
+                    # A 16 => 8, save B, mask off high byte of A
                     self.b = (self.a >> self.BYTE_WIDTH) & self.byteMask
                     self.a = self.a & self.byteMask
                 else:
                     # A 8 => 16, set A = b a
                     self.a = (self.b << self.BYTE_WIDTH) + self.a
+                    self.b = 0
             if p & self.IRS != self.p & self.IRS:
                 if self.p & self.IRS:
                     # X,Y 16 => 8, truncate X,Y
@@ -1334,6 +1372,7 @@ class MPU:
 
     @instruction(name="RTI", mode="stk", cycles=6)
     def inst_0x40(self):
+        # *** TODO: should this be similar to PLP? ***
         if self.mode:
             self.p = (self.stPop() | self.BREAK | self.UNUSED)
             self.pc = self.stPopWord()
@@ -1359,17 +1398,23 @@ class MPU:
 
     @instruction(name="MVP", mode="blk", cycles=7) # new to 65816
     def inst_0x44(self):
-        # MVP handles interrupts by not incrementing pc until A == $ffff
+        # MVP handles interrupts by not incrementing pc until C == $ffff
         # thus like the 65816 it completes the current byte transfer before
         # breaking for the interrupt and then returns
         # X is source, Y is dest ending addresses; A is bytes to move - 1 
         # Operand lsb is dest dbr, msb is source
-        if self.a != 0xffff:
+
+        if self.p & self.MS:
+            c = (self.b << self.BYTE_WIDTH) + self.a
+        else:
+            c = self.a
+
+        if c != 0xffff:
             self.opMVB(-1)
             self.pc -= 1 # move pc back to the MVP instruction
         else:
+            self.dbr = self.OperandByte()
             self.incPC(2)
-            self.dbr = self.OperandByte() << self.ADDR_WIDTH
 
     @instruction(name="EOR", mode="dpg", cycles=3)
     def inst_0x45(self):
@@ -1408,7 +1453,8 @@ class MPU:
 
     @instruction(name="JMP", mode="abs", cycles=3)
     def inst_0x4c(self):
-        self.pc = self.WordAt(self.pc)
+        self.pc = self.OperandWord()
+
 
     @instruction(name="EOR", mode="abs", cycles=4)
     def inst_0x4d(self):
@@ -1451,12 +1497,18 @@ class MPU:
         # breaking for the interrupt and then returns
         # X is source, Y is dest starting addresses; A is bytes to move - 1 
         # Operand lsb is dest dbr, msb is source
-        if self.a != 0xffff:
+
+        if self.p & self.MS:
+            c = (self.b << self.BYTE_WIDTH) + self.a
+        else:
+            c = self.a
+
+        if c != 0xffff:
             self.opMVB(1)
             self.pc -= 1 # move pc back to the MVP instruction
         else:
+            self.dbr = self.OperandByte()
             self.incPC(2)
-            self.dbr = self.OperandByte() << self.ADDR_WIDTH
 
     @instruction(name="EOR", mode="dpx", cycles=4)
     def inst_0x55(self):
@@ -1502,13 +1554,8 @@ class MPU:
 
     @instruction(name="JML", mode="abl", cycles=4)  # new to 65816
     def inst_0x5c(self):
-        # *** TODO: this doesn't seem right 
-        #  WordAt and ByteAt argument needs modified for pbr
-        #  and pbr needs to go to temp if last statement is correct
-        #  and last statement doesn't seem right (should be simple assignment?) ***
-        ta = self.WordAt(self.pc)
         self.pbr = self.ByteAt(self.pc + 2)
-        self.pc = self.WordAt(ta)
+        self.pc = self.OperandWord()
 
     @instruction(name="EOR", mode="abx", cycles=4, extracycles=1)
     def inst_0x5d(self):
@@ -1587,11 +1634,12 @@ class MPU:
     def inst_0x6b(self):
         self.pc = self.stPopWord()
         self.pbr = self.stPop()
+        self.incPC()
 
     @instruction(name="JMP", mode="abi", cycles=5)
     def inst_0x6c(self):
-        ta = self.WordAt(self.pc)
-        self.pc = self.WordAt(ta)
+        # 65C02 and 65816 don't wrap
+        self.pc = self.WordAt(self.AbsoluteIndirectAddr())
 
     @instruction(name="ADC", mode="abs", cycles=4)
     def inst_0x6d(self):
@@ -1669,7 +1717,7 @@ class MPU:
     def inst_0x7b(self):
         if self.p & self.MS:
             # A is 8 bit, hidden B is set to high byte
-            self.b = self.dbr >> self.BYTE_WIDTH
+            self.b = self.dpr >> self.BYTE_WIDTH
             self.a = self.dpr & self.byteMask
         else:
             # A is 16 bit
@@ -2046,12 +2094,9 @@ class MPU:
     def inst_0xba(self):
         if self.p & self.IRS:
             self.x = self.sp & self.byteMask
-        else:
-            self.x = self.sp
-
-        if self.p & self.IRS:
             self.FlagsNZ(self.x)
         else:
+            self.x = self.sp
             self.FlagsNZWord(self.x)
 
     @instruction(name="TYX", mode="imp", cycles=2) # new to 65816
@@ -2097,10 +2142,12 @@ class MPU:
         operand = self.OperandByte()
         mask = self.CARRY
         while mask:
+            # can't change BREAK or UNUSED flags in emulation mode
             if mask & operand and not (self.mode and (mask & self.BREAK or mask & self.UNUSED)):
                 if mask == self.MS and self.isCLR(self.MS):
                     # A 8 => 16, set A = b a
                     self.a = (self.b << self.BYTE_WIDTH) + self.a
+                    self.b = 0
                 self.pCLR(mask)
             mask = (mask << 1) & self.byteMask
         self.incPC()
@@ -2244,13 +2291,8 @@ class MPU:
 
     @instruction(name="JML", mode="ail", cycles=6)  # new to 65816
     def inst_0xdc(self):
-        # *** TODO: this doesn't seem right 
-        #  WordAt and ByteAt argument needs modified for pbr
-        #  and pbr needs to go to temp if last statement is correct
-        #  and last statement doesn't seem right (should be simple assignment?)***
-        ta = self.WordAt(self.pc)
         self.pbr = self.ByteAt(self.pc + 2)
-        self.pc = self.WordAt(ta)
+        self.pc = self.WordAt(self.OperandWord())
 
     @instruction(name="CMP", mode="abx", cycles=4, extracycles=1)
     def inst_0xdd(self):
@@ -2282,13 +2324,14 @@ class MPU:
         operand = self.OperandByte()
         mask = self.CARRY
         while mask:
+            # can't change BREAK or UNUSED flags in emulation mode
             if mask & operand and not (self.mode and (mask & self.BREAK or mask & self.UNUSED)):
                 if mask == self.MS and self.isCLR(self.MS):
-                    # A 16 => 8, save B, truncate A
+                    # A 16 => 8, save B, mask A high byte
                     self.b = (self.a >> self.BYTE_WIDTH) & self.byteMask
                     self.a = self.a & self.byteMask
                 elif mask == self.IRS and self.isCLR(self.IRS):
-                    # X,Y 16 => 8, truncate X,Y
+                    # X,Y 16 => 8, set high byte to zero
                     self.x = self.x & self.byteMask
                     self.y = self.y & self.byteMask
                 self.pSET(mask)
@@ -2342,17 +2385,19 @@ class MPU:
     @instruction(name="XBA", mode="imp", cycles=3) # new to 65816
     def inst_0xeb(self):
         a = self.a & self.byteMask
-        if self.p & self.MS: # 8 bit
-            b = self.b
-        else:
-            b = (self.a >> self.BYTE_WIDTH) & self.byteMask
 
         if self.p & self.MS: # 8 bit
+            b = self.b
             self.a = b
-#            self.b = a
+            self.b = a
         else: # 16 bits
+            b = (self.a >> self.BYTE_WIDTH) & self.byteMask
             self.a = (a << self.BYTE_WIDTH) + b
-        self.b = a
+
+        # *** TODO: check if B is ever relevant w/ 16-bit A.
+        # Basically, do I need to maintain a hidden B even when I have
+        # it as the high byte in A. ***
+
         self.FlagsNZ(b)
 
     @instruction(name="CPX", mode="abs", cycles=4)
@@ -2427,11 +2472,9 @@ class MPU:
     def inst_0xfa(self):
         if self.p & self.IRS:
             self.x = self.stPop()
-        else:
-            self.x = self.stPopWord()
-        if self.p & self.IRS:
             self.FlagsNZ(self.x)
         else:
+            self.x = self.stPopWord()
             self.FlagsNZWord(self.x)
 
     @instruction(name="XCE", mode="imp", cycles=2) # new to 65816

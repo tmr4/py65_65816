@@ -1679,13 +1679,839 @@ class MPUTests(unittest.TestCase):
         self.assertEqual(0xFF, mpu.memory[0x0010 + 1 + mpu.x])
         self.assertEqual(mpu.CARRY, mpu.p & mpu.CARRY)
 
+    # BIT Absolute
 
+    def test_bit_abs_copies_bit_7_of_memory_to_n_flag_when_0(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.NEGATIVE)
+        # $0000 BIT $FEED
+        self._write(mpu.memory, 0x0000, (0x2C, 0xED, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0xFF, 0xFF))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
 
+    def test_bit_abs_copies_bit_7_of_memory_to_n_flag_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.NEGATIVE
+        # $0000 BIT $FEED
+        self._write(mpu.memory, 0x0000, (0x2C, 0xED, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x00, 0x00))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
 
+    def test_bit_abs_copies_bit_6_of_memory_to_v_flag_when_0(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.OVERFLOW)
+        # $0000 BIT $FEED
+        self._write(mpu.memory, 0x0000, (0x2C, 0xED, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0xFF, 0xFF))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(mpu.OVERFLOW, mpu.p & mpu.OVERFLOW)
 
+    def test_bit_abs_copies_bit_6_of_memory_to_v_flag_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.OVERFLOW
+        # $0000 BIT $FEED
+        self._write(mpu.memory, 0x0000, (0x2C, 0xED, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x00, 0x00))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.OVERFLOW)
 
+    def test_bit_abs_stores_result_of_and_in_z_preserves_a_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~mpu.ZERO
+        # $0000 BIT $FEED
+        self._write(mpu.memory, 0x0000, (0x2C, 0xED, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x00, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x00, mpu.memory[0xFEED])
 
+    def test_bit_abs_stores_result_of_and_when_nonzero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.ZERO
+        # $0000 BIT $FEED
+        self._write(mpu.memory, 0x0000, (0x2C, 0xED, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x01, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.ZERO)  # result of AND is non-zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x01, mpu.memory[0xFEED])
 
+    def test_bit_abs_stores_result_of_and_when_zero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.ZERO)
+        # $0000 BIT $FEED
+        self._write(mpu.memory, 0x0000, (0x2C, 0xED, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x00, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)  # result of AND is zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x00, mpu.memory[0xFEED])
+
+    # BIT Absolute, X-Indexed
+
+    def test_bit_abs_x_copies_bit_7_of_memory_to_n_flag_when_0(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.NEGATIVE)
+        mpu.x = 0x02
+        # $0000 BIT $FEEB,X
+        self._write(mpu.memory, 0x0000, (0x3C, 0xEB, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0xFF, 0xFF))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x0003, mpu.pc)
+
+    def test_bit_abs_x_copies_bit_7_of_memory_to_n_flag_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.NEGATIVE
+        mpu.x = 0x02
+        # $0000 BIT $FEEB,X
+        self._write(mpu.memory, 0x0000, (0x3C, 0xEB, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x00, 0x00))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x0003, mpu.pc)
+
+    def test_bit_abs_x_copies_bit_6_of_memory_to_v_flag_when_0(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.OVERFLOW)
+        mpu.x = 0x02
+        # $0000 BIT $FEEB,X
+        self._write(mpu.memory, 0x0000, (0x3C, 0xEB, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0xFF, 0xFF))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(mpu.OVERFLOW, mpu.p & mpu.OVERFLOW)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x0003, mpu.pc)
+
+    def test_bit_abs_x_copies_bit_6_of_memory_to_v_flag_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.OVERFLOW
+        mpu.x = 0x02
+        # $0000 BIT $FEEB,X
+        self._write(mpu.memory, 0x0000, (0x3C, 0xEB, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x00, 0x00))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.OVERFLOW)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x0003, mpu.pc)
+
+    def test_bit_abs_x_stores_result_of_and_in_z_preserves_a_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~mpu.ZERO
+        mpu.x = 0x02
+        # $0000 BIT $FEEB,X
+        self._write(mpu.memory, 0x0000, (0x3C, 0xEB, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x00, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x00, mpu.memory[0xFEED])
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x0003, mpu.pc)
+
+    def test_bit_abs_x_stores_result_of_and_nonzero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.ZERO
+        mpu.x = 0x02
+        # $0000 BIT $FEEB,X
+        self._write(mpu.memory, 0x0000, (0x3C, 0xEB, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x01, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.ZERO)  # result of AND is non-zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x01, mpu.memory[0xFEED])
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x0003, mpu.pc)
+
+    def test_bit_abs_x_stores_result_of_and_when_zero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.ZERO)
+        mpu.x = 0x02
+        # $0000 BIT $FEEB,X
+        self._write(mpu.memory, 0x0000, (0x3C, 0xEB, 0xFE))
+        self._write(mpu.memory, 0xFEED, (0x00, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)  # result of AND is zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x00, mpu.memory[0xFEED])
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x0003, mpu.pc)
+
+    # BIT Direct Page
+
+    def test_bit_dp_copies_bit_7_of_memory_to_n_flag_when_0(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.NEGATIVE)
+        # $0000 BIT $0010
+        self._write(mpu.memory, 0x0000, (0x24, 0x10))
+        self._write(mpu.memory, 0x0010, (0xFF, 0xFF))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(3, mpu.processorCycles)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+
+    def test_bit_dp_copies_bit_7_of_memory_to_n_flag_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.NEGATIVE
+        # $0000 BIT $0010
+        self._write(mpu.memory, 0x0000, (0x24, 0x10))
+        self._write(mpu.memory, 0x0010, (0x00, 0x00))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(3, mpu.processorCycles)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    def test_bit_dp_copies_bit_6_of_memory_to_v_flag_when_0(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.OVERFLOW)
+        # $0000 BIT $0010
+        self._write(mpu.memory, 0x0000, (0x24, 0x10))
+        self._write(mpu.memory, 0x0010, (0xFF, 0xFF))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(3, mpu.processorCycles)
+        self.assertEqual(mpu.OVERFLOW, mpu.p & mpu.OVERFLOW)
+
+    def test_bit_dp_copies_bit_6_of_memory_to_v_flag_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.OVERFLOW
+        # $0000 BIT $0010
+        self._write(mpu.memory, 0x0000, (0x24, 0x10))
+        self._write(mpu.memory, 0x0010, (0x00, 0x00))
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(3, mpu.processorCycles)
+        self.assertEqual(0, mpu.p & mpu.OVERFLOW)
+
+    def test_bit_dp_stores_result_of_and_in_z_preserves_a_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~mpu.ZERO
+        # $0000 BIT $0010
+        self._write(mpu.memory, 0x0000, (0x24, 0x10))
+        self._write(mpu.memory, 0x0010, (0x00, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(3, mpu.processorCycles)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x00, mpu.memory[0x0010])
+
+    def test_bit_dp_stores_result_of_and_when_nonzero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.ZERO
+        # $0000 BIT $0010
+        self._write(mpu.memory, 0x0000, (0x24, 0x10))
+        self._write(mpu.memory, 0x0010, (0x01, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(3, mpu.processorCycles)
+        self.assertEqual(0, mpu.p & mpu.ZERO)  # result of AND is non-zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x01, mpu.memory[0x0010])
+
+    def test_bit_dp_stores_result_of_and_when_zero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.ZERO)
+        # $0000 BIT $0010
+        self._write(mpu.memory, 0x0000, (0x24, 0x10))
+        self._write(mpu.memory, 0x0010, (0x00, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(3, mpu.processorCycles)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)  # result of AND is zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x00, mpu.memory[0x0010])
+
+    # BIT Direct Page, X-Indexed
+
+    def test_bit_dp_x_copies_bit_7_of_memory_to_n_flag_when_0(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.NEGATIVE)
+        # $0000 BIT $0010,X
+        self._write(mpu.memory, 0x0000, (0x34, 0x10))
+        self._write(mpu.memory, 0x0013, (0xFF, 0xFF))
+        mpu.x = 0x03
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+
+    def test_bit_dp_x_copies_bit_7_of_memory_to_n_flag_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.NEGATIVE
+        # $0000 BIT $0010,X
+        self._write(mpu.memory, 0x0000, (0x34, 0x10))
+        self._write(mpu.memory, 0x0013, (0x00, 0x00))
+        mpu.x = 0x03
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    def test_bit_dp_x_copies_bit_6_of_memory_to_v_flag_when_0(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.OVERFLOW)
+        # $0000 BIT $0010,X
+        self._write(mpu.memory, 0x0000, (0x34, 0x10))
+        self._write(mpu.memory, 0x0013, (0xFF, 0xFF))
+        mpu.x = 0x03
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(mpu.OVERFLOW, mpu.p & mpu.OVERFLOW)
+
+    def test_bit_dp_x_copies_bit_6_of_memory_to_v_flag_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.OVERFLOW
+        # $0000 BIT $0010,X
+        self._write(mpu.memory, 0x0000, (0x34, 0x10))
+        self._write(mpu.memory, 0x0013, (0x00, 0x00))
+        mpu.x = 0x03
+        mpu.a = 0xFF
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0, mpu.p & mpu.OVERFLOW)
+
+    def test_bit_dp_x_stores_result_of_and_in_z_preserves_a_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~mpu.ZERO
+        # $0000 BIT $0010,X
+        self._write(mpu.memory, 0x0000, (0x34, 0x10))
+        self._write(mpu.memory, 0x0013, (0x00, 0x00))
+        mpu.x = 0x03
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x00, mpu.memory[0x0010 + mpu.x])
+
+    def test_bit_dp_x_stores_result_of_and_when_nonzero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.ZERO
+        # $0000 BIT $0010,X
+        self._write(mpu.memory, 0x0000, (0x34, 0x10))
+        self._write(mpu.memory, 0x0013, (0x01, 0x00))
+        mpu.x = 0x03
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.ZERO)  # result of AND is non-zero
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x01, mpu.memory[0x0010 + mpu.x])
+
+    def test_bit_dp_x_stores_result_of_and_when_zero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.ZERO)
+        # $0000 BIT $0010,X
+        self._write(mpu.memory, 0x0000, (0x34, 0x10))
+        self._write(mpu.memory, 0x0013, (0x00, 0x00))
+        mpu.x = 0x03
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(4, mpu.processorCycles)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)  # result of AND is zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(0x00, mpu.memory[0x0010 + mpu.x])
+
+    # BIT Immediate
+
+    def test_bit_imm_does_not_affect_n_and_z_flags(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.NEGATIVE | mpu.OVERFLOW
+        # $0000 BIT #$FFFF
+        self._write(mpu.memory, 0x0000, (0x89, 0xff, 0xff))
+        mpu.a = 0x00
+        mpu.step()
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(mpu.OVERFLOW, mpu.p & mpu.OVERFLOW)
+        self.assertEqual(0x00, mpu.a)
+        self.assertEqual(2, mpu.processorCycles)
+        self.assertEqual(0x03, mpu.pc)
+
+    def test_bit_imm_stores_result_of_and_in_z_preserves_a_when_1(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~mpu.ZERO
+        # $0000 BIT #$0000
+        self._write(mpu.memory, 0x0000, (0x89, 0x00, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(2, mpu.processorCycles)
+        self.assertEqual(0x03, mpu.pc)
+
+    def test_bit_imm_stores_result_of_and_when_nonzero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p |= mpu.ZERO
+        # $0000 BIT #$0001
+        self._write(mpu.memory, 0x0000, (0x89, 0x01, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.ZERO)  # result of AND is non-zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(2, mpu.processorCycles)
+        self.assertEqual(0x03, mpu.pc)
+
+    def test_bit_imm_stores_result_of_and_when_zero_in_z_preserves_a(self):
+        mpu = self._make_mpu()
+        mpu.p &= ~(mpu.ZERO)
+        # $0000 BIT #$0000
+        self._write(mpu.memory, 0x0000, (0x89, 0x00, 0x00))
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)  # result of AND is zero
+        self.assertEqual(0x01, mpu.a)
+        self.assertEqual(2, mpu.processorCycles)
+        self.assertEqual(0x03, mpu.pc)
+
+    # Compare instructions
+
+    # See http://6502.org/tutorials/compare_instructions.html
+    # and http://www.6502.org/tutorials/compare_beyond.html
+    # Cheat sheet:
+    #
+    #    - Comparison is actually subtraction "register - memory"
+    #    - Z contains equality result (1 equal, 0 not equal)
+    #    - C contains result of unsigned comparison (0 if A<m, 1 if A>=m)
+    #    - N holds MSB of subtraction result (*NOT* of signed subtraction)
+    #    - V is not affected by comparison
+    #    - D has no effect on comparison
+
+    # CMP Immediate
+
+    def test_cmp_imm_sets_zero_carry_clears_neg_flags_if_equal(self):
+        """Comparison: A == m"""
+        mpu = self._make_mpu()
+        # $0000 CMP #10 , A will be 0x1010
+        self._write(mpu.memory, 0x0000, (0xC9, 0x10, 0x10))
+        mpu.a = 0x1010
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.CARRY, mpu.p & mpu.CARRY)
+
+    def test_cmp_imm_clears_zero_carry_takes_neg_if_less_unsigned(self):
+        """Comparison: A < m (unsigned)"""
+        mpu = self._make_mpu()
+        # $0000 CMP #10 , A will be 1
+        self._write(mpu.memory, 0x0000, (0xC9, 0x10, 0x10))
+        mpu.a = 1
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE) # 0x01-0x0A=0xF7
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.CARRY)
+
+    def test_cmp_imm_clears_zero_sets_carry_takes_neg_if_less_signed(self):
+        """Comparison: A < #nn (signed), A negative"""
+        mpu = self._make_mpu()
+        # $0000 CMP #1, A will be -1 (0xFFFF)
+        self._write(mpu.memory, 0x0000, (0xC9, 0x01, 0x00))
+        mpu.a = 0xFFFF
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE) # 0xFFFF-0x0001=0xFFFE
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.CARRY, mpu.p & mpu.CARRY) # A>m unsigned
+
+    def test_cmp_imm_clears_zero_carry_takes_neg_if_less_signed_nega(self):
+        """Comparison: A < m (signed), A and m both negative"""
+        mpu = self._make_mpu()
+        # $0000 CMP #0xFFFF (-1), A will be -2 (0xFFFE)
+        self._write(mpu.memory, 0x0000, (0xC9, 0xFF, 0xFF))
+        mpu.a = 0xFFFE
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE) # 0xFE-0xFF=0xFF
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.CARRY) # A<m unsigned
+
+    def test_cmp_imm_clears_zero_sets_carry_takes_neg_if_more_unsigned(self):
+        """Comparison: A > m (unsigned)"""
+        mpu = self._make_mpu()
+        # $0000 CMP #1 , A will be 10
+        self._write(mpu.memory, 0x0000, (0xC9, 0X01, 0X00))
+        mpu.a = 10
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE) # 0x0A-0x01 = 0x09
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.CARRY, mpu.p & mpu.CARRY) # A>m unsigned
+
+    def test_cmp_imm_clears_zero_carry_takes_neg_if_more_signed(self):
+        """Comparison: A > m (signed), memory negative"""
+        mpu = self._make_mpu()
+        # $0000 CMP #$FFFF (-1), A will be 2
+        self._write(mpu.memory, 0x0000, (0xC9, 0xFF, 0XFF))
+        mpu.a = 2
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE) # 0x02-0xFF=0x01
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.CARRY) # A<m unsigned
+
+    def test_cmp_imm_clears_zero_carry_takes_neg_if_more_signed_nega(self):
+        """Comparison: A > m (signed), A and m both negative"""
+        mpu = self._make_mpu()
+        # $0000 CMP #$FFFE (-2), A will be -1 (0xFFFF)
+        self._write(mpu.memory, 0x0000, (0xC9, 0xFE, 0xFF))
+        mpu.a = 0xFFFF
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE) # 0xFF-0xFE=0x01
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.CARRY, mpu.p & mpu.CARRY) # A>m unsigned
+
+    # CMP Direct Page, Indirect
+
+    def test_cmp_dpi_sets_z_flag_if_equal(self):
+        mpu = self._make_mpu()
+        mpu.a = 0x42FF
+        # $0000 AND ($10)
+        # $0010 Vector to $ABCD
+        self._write(mpu.memory, 0x0000, (0xd2, 0x10))
+        self._write(mpu.memory, 0x0010, (0xCD, 0xAB))
+        self._write(mpu.memory, 0xABCD, (0xFF, 0x42))
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(5, mpu.processorCycles)
+        self.assertEqual(0x42FF, mpu.a)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    def test_cmp_dpi_resets_z_flag_if_unequal(self):
+        mpu = self._make_mpu()
+        mpu.a = 0x43FF
+        # $0000 AND ($10)
+        # $0010 Vector to $ABCD
+        self._write(mpu.memory, 0x0000, (0xd2, 0x10))
+        self._write(mpu.memory, 0x0010, (0xCD, 0xAB))
+        self._write(mpu.memory, 0xABCD, (0xFF, 0x42))
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(5, mpu.processorCycles)
+        self.assertEqual(0x43FF, mpu.a)
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    # CPX Immediate
+
+    def test_cpx_imm_sets_zero_carry_clears_neg_flags_if_equal(self):
+        """Comparison: X == m"""
+        mpu = self._make_mpu()
+        # $0000 CPX #$20ff
+        self._write(mpu.memory, 0x0000, (0xE0, 0xff, 0x20))
+        mpu.x = 0x20ff
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.CARRY, mpu.p & mpu.CARRY)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    # CPY Immediate
+
+    def test_cpy_imm_sets_zero_carry_clears_neg_flags_if_equal(self):
+        """Comparison: Y == m"""
+        mpu = self._make_mpu()
+        # $0000 CPY #$30ff
+        self._write(mpu.memory, 0x0000, (0xC0, 0xff, 0x30))
+        mpu.y = 0x30ff
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.CARRY, mpu.p & mpu.CARRY)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    # DEC Absolute
+
+    def test_dec_abs_decrements_memory(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0xABCD
+        self._write(mpu.memory, 0x0000, (0xCE, 0xCD, 0xAB))
+        self._write(mpu.memory, 0xABCD, (0x10, 0x10))
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0x0F, mpu.memory[0xABCD])
+        self.assertEqual(0x10, mpu.memory[0xABCD+1])
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+
+    def test_dec_abs_below_00_rolls_over_and_sets_negative_flag(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0xABCD
+        self._write(mpu.memory, 0x0000, (0xCE, 0xCD, 0xAB))
+        self._write(mpu.memory, 0xABCD, (0x00, 0x00))
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0xFF, mpu.memory[0xABCD])
+        self.assertEqual(0xFF, mpu.memory[0xABCD+1])
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+
+    def test_dec_abs_sets_zero_flag_when_decrementing_to_zero(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0xABCD
+        self._write(mpu.memory, 0x0000, (0xCE, 0xCD, 0xAB))
+        self._write(mpu.memory, 0xABCD, (0x01, 0x00))
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0x00, mpu.memory[0xABCD])
+        self.assertEqual(0x00, mpu.memory[0xABCD+1])
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    # DEC Accumulator
+
+    def test_dec_a_decreases_a(self):
+        mpu = self._make_mpu()
+        # $0000 DEC
+        self._write(mpu.memory, 0x0000, [0x3A])
+        mpu.a = 0x0148
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0x0147, mpu.a)
+
+    def test_dec_a_sets_zero_flag(self):
+        mpu = self._make_mpu()
+        # $0000 DEC
+        self._write(mpu.memory, 0x0000, [0x3A])
+        mpu.a = 0x01
+        mpu.step()
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0x00, mpu.a)
+
+    def test_dec_a_wraps_at_zero(self):
+        mpu = self._make_mpu()
+        # $0000 DEC
+        self._write(mpu.memory, 0x0000, [0x3A])
+        mpu.a = 0x00
+        mpu.step()
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0xffFF, mpu.a)
+
+    # DEC Direct Page
+
+    def test_dec_dp_decrements_memory(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0x0010
+        self._write(mpu.memory, 0x0000, (0xC6, 0x10))
+        self._write(mpu.memory, 0x0010, (0x10, 0x10))
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(0x0F, mpu.memory[0x0010])
+        self.assertEqual(0x10, mpu.memory[0x0010+1])
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+
+    def test_dec_dp_below_00_rolls_over_and_sets_negative_flag(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0x0010
+        self._write(mpu.memory, 0x0000, (0xC6, 0x10))
+        self._write(mpu.memory, 0x0010, (0x00, 0x00))
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(0xFF, mpu.memory[0x0010])
+        self.assertEqual(0xFF, mpu.memory[0x0010+1])
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+
+    def test_dec_dp_sets_zero_flag_when_decrementing_to_zero(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0x0010
+        self._write(mpu.memory, 0x0000, (0xC6, 0x10))
+        self._write(mpu.memory, 0x0010, (0x01, 0x00))
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(0x00, mpu.memory[0x0010])
+        self.assertEqual(0x00, mpu.memory[0x0010+1])
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    # DEC Absolute, X-Indexed
+
+    def test_dec_abs_x_decrements_memory(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0xABCD,X
+        self._write(mpu.memory, 0x0000, (0xDE, 0xCD, 0xAB))
+        mpu.x = 0x03
+        self._write(mpu.memory, 0xABCD + mpu.x, (0x10, 0x10))
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0x0F, mpu.memory[0xABCD + mpu.x])
+        self.assertEqual(0x10, mpu.memory[0xABCD + 1 + mpu.x])
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+
+    def test_dec_abs_x_below_00_rolls_over_and_sets_negative_flag(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0xABCD,X
+        self._write(mpu.memory, 0x0000, (0xDE, 0xCD, 0xAB))
+        self._write(mpu.memory, 0xABCD + mpu.x, (0x00, 0x00))
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0xFF, mpu.memory[0xABCD + mpu.x])
+        self.assertEqual(0xFF, mpu.memory[0xABCD + 1 + mpu.x])
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+
+    def test_dec_abs_x_sets_zero_flag_when_decrementing_to_zero(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0xABCD,X
+        self._write(mpu.memory, 0x0000, (0xDE, 0xCD, 0xAB))
+        self._write(mpu.memory, 0xABCD + mpu.x, (0x01, 0x00))
+        mpu.step()
+        self.assertEqual(0x0003, mpu.pc)
+        self.assertEqual(0x00, mpu.memory[0xABCD + mpu.x])
+        self.assertEqual(0x00, mpu.memory[0xABCD + 1 + mpu.x])
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    # DEC Direct Page, X-Indexed
+
+    def test_dec_dp_x_decrements_memory(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0x0010,X
+        self._write(mpu.memory, 0x0000, (0xD6, 0x10))
+        mpu.x = 0x03
+        self._write(mpu.memory, 0x0010 + mpu.x, (0x10, 0x10))
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(0x0F, mpu.memory[0x0010 + mpu.x])
+        self.assertEqual(0x10, mpu.memory[0x0010 + 1 + mpu.x])
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+
+    def test_dec_dp_x_below_00_rolls_over_and_sets_negative_flag(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0x0010,X
+        self._write(mpu.memory, 0x0000, (0xD6, 0x10))
+        mpu.x = 0x03
+        self._write(mpu.memory, 0x0010 + mpu.x, (0x00, 0x00))
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(0xFF, mpu.memory[0x0010 + mpu.x])
+        self.assertEqual(0xFF, mpu.memory[0x0010 + 1 + mpu.x])
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+
+    def test_dec_dp_x_sets_zero_flag_when_decrementing_to_zero(self):
+        mpu = self._make_mpu()
+        # $0000 DEC 0x0010,X
+        self._write(mpu.memory, 0x0000, (0xD6, 0x10))
+        mpu.x = 0x03
+        self._write(mpu.memory, 0x0010 + mpu.x, (0x01, 0x00))
+        mpu.step()
+        self.assertEqual(0x0002, mpu.pc)
+        self.assertEqual(0x00, mpu.memory[0x0010 + mpu.x])
+        self.assertEqual(0x00, mpu.memory[0x0010 + 1 + mpu.x])
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    # DEX
+
+    def test_dex_decrements_x(self):
+        mpu = self._make_mpu()
+        mpu.x = 0x110
+        # $0000 DEX
+        mpu.memory[0x0000] = 0xCA
+        mpu.step()
+        self.assertEqual(0x0001, mpu.pc)
+        self.assertEqual(0x10F, mpu.x)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+
+    def test_dex_below_00_rolls_over_and_sets_negative_flag(self):
+        mpu = self._make_mpu()
+        mpu.x = 0x00
+        # $0000 DEX
+        mpu.memory[0x0000] = 0xCA
+        mpu.step()
+        self.assertEqual(0x0001, mpu.pc)
+        self.assertEqual(0xffFF, mpu.x)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+
+    def test_dex_sets_zero_flag_when_decrementing_to_zero(self):
+        mpu = self._make_mpu()
+        mpu.x = 0x01
+        # $0000 DEX
+        mpu.memory[0x0000] = 0xCA
+        mpu.step()
+        self.assertEqual(0x0001, mpu.pc)
+        self.assertEqual(0x0000, mpu.x)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+
+    # DEY
+
+    def test_dey_decrements_y(self):
+        mpu = self._make_mpu()
+        mpu.y = 0x110
+        # $0000 DEY
+        mpu.memory[0x0000] = 0x88
+        mpu.step()
+        self.assertEqual(0x0001, mpu.pc)
+        self.assertEqual(0x10F, mpu.y)
+        self.assertEqual(0, mpu.p & mpu.NEGATIVE)
+        self.assertEqual(0, mpu.p & mpu.ZERO)
+
+    def test_dey_below_00_rolls_over_and_sets_negative_flag(self):
+        mpu = self._make_mpu()
+        mpu.y = 0x00
+        # $0000 DEY
+        mpu.memory[0x0000] = 0x88
+        mpu.step()
+        self.assertEqual(0x0001, mpu.pc)
+        self.assertEqual(0xFFff, mpu.y)
+        self.assertEqual(mpu.NEGATIVE, mpu.p & mpu.NEGATIVE)
+
+    def test_dey_sets_zero_flag_when_decrementing_to_zero(self):
+        mpu = self._make_mpu()
+        mpu.y = 0x01
+        # $0000 DEY
+        mpu.memory[0x0000] = 0x88
+        mpu.step()
+        self.assertEqual(0x0001, mpu.pc)
+        self.assertEqual(0x0000, mpu.y)
+        self.assertEqual(mpu.ZERO, mpu.p & mpu.ZERO)
 
 
     # *** TODO: probably makes sense to move the relevant values to the high byte or perhaps both since we've already tested the low byte in 8 bit ***
