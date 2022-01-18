@@ -53,6 +53,10 @@ You can run the unit tests with `python -m unittest test_mpu65c816_emulation.py`
 
 It wasn't easy to find a sizable program to test with the new 65C816 simulation.  You can run the slightly modified version of Liara Forth with `python monitor.py -m 65c816 -l liara.bin -g 5000 -i fff0 -o fff1`.
 
+# Testing the 65C816 Simulation with OF816
+
+I ported [OF816](https://github.com/tmr4/of816), another sizable program, to test with the new 65C816 simulation.  OF816 is an attractive test program becuase it uses many more 65816 features than Liara Forth.  As such I've been able to track down more errors in the simulation.  You can run py65816 version of OF816 with `python monitor.py -m 65c816 -r of816_forth.bin -i 7FC0 -o 7FE0` (TDB load a binary for this after checking license requirements).
+
 # Limitations
 
 1. The new 65C816 device is largely untested.  I plan to update it as I work on supporting hardware and code.  Use at your own risk.  Some know issues:
@@ -74,7 +78,8 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 * Initial commit: January 11, 2022
 * Successfully tested my 65C02 Forth in emulation mode
 * Was able to run Liara Forth in native mode in block 0.
-* Successfully ran 507 unit tests in emulation mode, 506 unit tests in native 8-bit mode and 157 unit tests in native 16-bit mode.
+* Was able to start OF816.  Currently input is accepted but not properly interpreted.
+* Successfully ran 507 unit tests in emulation mode, 506 unit tests in native 8-bit mode and 226 unit tests in native 16-bit mode.
   * FIXED: (Many words cause it to crash (likely due to one of the limitations listed above).)
   * FIXED: Currently all numbers print out as 0.  After verifying that Liara Forth works properly on the W65C265SXB development board, using my debug window (https://github.com/tmr4/py65_debug_window) I tracked the issue down to UM* where the high byte in the high cell of the result is zero (for example $1234 * $1234 = $14b5a90 but my 65816 simulation is yielding $04b5a90).  I couldn't find any obvious errors in my code after examining each line code for the Liara Forth UM*.  I'm ending up with a 24 bit value rather than a 32 bit one, so that may give me a clue to what's happening. Update: turns out I was shifting the high byte by the byte mask ($ffff) instead of the byte width ($08)! Oops.
 
@@ -83,5 +88,6 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 * COMPLETED: Resolve simulator issues with running Liara Forth.  I view this as a robust test of the 65816 simulator, other than bank switching, which Liara Forth doesn't handle out of the box.  Some hardware specific Liara Forth features will not work with the simulator (KEY? for example which is hardwired to a W65C265SXB development board specific address indicating whether a key has been pressed).
 * Add native mode unit tests.
   * Native mode, 8-bit tests: In progress. Added 506 unit tests modified from the emulation mode tests.
-  * Native mode, 16-bit and mixed-bit tests: Just going with brut force.  157 unit tests added so far for ADC, AND ASL and SBC.  These have already proven their worth by pointing out a problem with how I calculated the overflow flag in ADC.  
+  * Native mode, 16-bit and mixed-bit tests: Just going with brut force.  226 unit tests added so far for ADC AND ASL BIT CMP CPX CPY DEC DEX DEY SBC.  These have already proven their worth by pointing out a problem with how I calculated the overflow flag in ADC.  Still the going is slow.  
     * Older entry: Still looking for an easy way to do this.  All of the 65816 testing frameworks I've found so far require an amount of conversion almost equal to modifying the emulation mode tests for native mode.
+* I ported [OF816](https://github.com/tmr4/of816) to get another test program.  With this I fixed several errors with several instructions, mainly those involving long address modes, but also the TSB and TRB instructions.  The port starts properly in py65 but input is not yet properly interpreted by the system.  Tracking the error is made more difficult in that much of the program is coded in Forth, making it more difficult to debug in py65.
