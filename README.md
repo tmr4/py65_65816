@@ -55,7 +55,7 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 
 # Testing the 65C816 Simulation with OF816
 
-I ported [OF816](https://github.com/tmr4/of816), another sizable program, to test with the new 65C816 simulation.  OF816 is an attractive test program becuase it uses many more 65816 features than Liara Forth.  As such I've been able to track down more errors in the simulation.  You can run py65816 version of OF816 with `python monitor.py -m 65c816 -r of816_forth.bin -i 7FC0 -o 7FE0` (TDB load a binary for this after checking license requirements).
+I ported [OF816](https://github.com/tmr4/of816), another sizable program, to test with the new 65C816 simulation.  OF816 is an attractive test program because it uses many more 65816 features than Liara Forth.  As such I've been able to track down more errors in the simulation.  You can run py65816 version of OF816 with `python monitor.py -m 65c816 -r of816_forth.bin -i 7FC0 -o 7FE0` (TDB load a binary for this after checking license requirements).
 
 # Limitations
 
