@@ -160,6 +160,13 @@ class MPU:
     def WordAt(self, addr):
         return self.ByteAt(addr) + (self.ByteAt(addr + 1) << self.BYTE_WIDTH)
 
+    # *** useful for debuging for now, may be able to incorporate them ***
+    def LongAt(self, addr):
+        return (self.ByteAt(addr + 2) << self.ADDR_WIDTH) + (self.ByteAt(addr + 1) << self.BYTE_WIDTH) + self.ByteAt(addr)
+
+    def TCAt(self, addr):
+        return (self.WordAt(addr + 2) << self.ADDR_WIDTH) + self.WordAt(addr)
+
     def WrapAt(self, addr):
         wrap = lambda x: (x & self.addrHighMask) + ((x + 1) & self.byteMask)
         return self.ByteAt(addr) + (self.ByteAt(wrap(addr)) << self.BYTE_WIDTH)
@@ -352,42 +359,50 @@ class MPU:
 
     def DirectPageIndirectXAddr(self): # "dix" (8 opcodes)
         # *** TODO: verify WrapAt works correctly at $ffff ***
-        dpaddr = self.WrapAt((self.dpr + self.x + self.OperandByte()) & self.addrMask)
-        return (self.dbr << self.ADDR_WIDTH) + dpaddr
+#        dpaddr = self.WrapAt((self.dpr + self.x + self.OperandByte()) & self.addrMask)
+        dpaddr = (self.dpr + self.x + self.OperandByte()) & self.addrMask
+        inaddr = self.WrapAt(dpaddr)
+        return (self.dbr << self.ADDR_WIDTH) + inaddr
 
     def DirectPageIndirectAddr(self): # "dpi" (8 opcodes)
         # *** TODO: verify WrapAt works correctly at $ffff ***
-        dpaddr = self.WrapAt((self.dpr + self.OperandByte()) & self.addrMask)
-        return (self.dbr << self.ADDR_WIDTH) + dpaddr
+        dpaddr = (self.dpr + self.OperandByte()) & self.addrMask
+        inaddr = self.WrapAt(dpaddr)
+        return (self.dbr << self.ADDR_WIDTH) + inaddr
 
     def DirectPageIndirectLongAddr(self): # new to 65816, "dil" (8 opcodes)
         # *** TODO: check on if need wrap at $ffff (seems likely) ***
-        dpaddr = self.dpr + self.OperandByte()
+        dpaddr = (self.dpr + self.OperandByte()) & self.addrMask
         addr = (self.ByteAt(dpaddr + 2) << self.ADDR_WIDTH) + self.WordAt(dpaddr)
         return addr
 
     def DirectPageIndirectYAddr(self): # "diy" (8 opcodes)
         # *** TODO: verify WrapAt works correctly at $ffff ***
-        dpaddr = self.WrapAt((self.dpr + self.OperandByte()) & self.addrMask)
-        a1 = (self.dbr << self.ADDR_WIDTH) + dpaddr
-        a2 = a1 + self.y
+#        dpaddr = self.WrapAt((self.dpr + self.OperandByte()) & self.addrMask)
+#        a1 = (self.dbr << self.ADDR_WIDTH) + dpaddr
+#        a2 = a1 + self.y
+        dpaddr = (self.dpr + self.OperandByte()) & self.addrMask
+        #inaddr = self.WrapAt(dpaddr)
+        inaddr = self.WordAt(dpaddr)
+        efaddr = (self.dbr << self.ADDR_WIDTH) + inaddr + self.y
         if self.addcycles:
-            if (a1 & self.addrBankMask) != (a2 & self.addrBankMask):
+            if (inaddr & self.addrBankMask) != (efaddr & self.addrBankMask):
                 self.excycles += 1
-        return a2
+        return efaddr
 
     def DirectPageIndirectLongYAddr(self): # new to 65816, "dly" (8 opcodes)
         # *** TODO: verify WrapAt works correctly at $ffff ***
-#        dpaddr = self.dpr + self.OperandByte()
-        dpaddr = self.WrapAt((self.dpr + self.OperandByte()) & self.addrMask)
-#        addr = (self.ByteAt(dpaddr + 2) << self.ADDR_WIDTH) + self.WordAt(dpaddr)
-#        a1 = addr
-        a1 = (self.ByteAt(dpaddr + 2) << self.ADDR_WIDTH) + dpaddr
-        a2 = a1 + self.y
+#        dpaddr = self.WrapAt((self.dpr + self.OperandByte()) & self.addrMask)
+#        dpaddr = self.WordAt((self.dpr + self.OperandByte()) & self.addrMask)
+#        a1 = (self.ByteAt(dpaddr + 2) << self.ADDR_WIDTH) + dpaddr
+#        a2 = a1 + self.y
+        dpaddr = (self.dpr + self.OperandByte()) & self.addrMask
+        inaddr = (self.ByteAt(dpaddr + 2) << self.ADDR_WIDTH) + self.WordAt(dpaddr)
+        efaddr = inaddr + self.y
         if self.addcycles:
-            if (a1 & self.addrBankMask) != (a2 & self.addrBankMask):
+            if (inaddr & self.addrBankMask) != (efaddr & self.addrBankMask):
                 self.excycles += 1
-        return a2
+        return efaddr
 
     def ImmediateAddr(self): # "imm" (14 opcodes)
         return self.OperandAddr()
@@ -439,7 +454,12 @@ class MPU:
 
     def StackRelIndirectYAddr(self): # "siy" (8 opcode)
         # *** TODO: does this need WrapAt? ***
-        return (self.dbr << self.ADDR_WIDTH) + self.WordAt((self.sp + self.OperandByte()) & self.addrMask) + self.y
+#        return (self.dbr << self.ADDR_WIDTH) + self.WordAt((self.sp + self.OperandByte()) & self.addrMask) + self.y
+        spaddr = (self.sp + self.OperandByte()) & self.addrMask
+        #inaddr = self.WrapAt(spaddr)
+        inaddr = self.WordAt(spaddr)
+        # *** TODO: any extra cycles? ***
+        return (self.dbr << self.ADDR_WIDTH) + inaddr + self.y
 
     # operations
 
@@ -1918,6 +1938,10 @@ class MPU:
     @instruction(name="TXY", mode="imp", cycles=2) # new to 65816
     def inst_0x9b(self):
         self.y = self.x
+        if self.p & self.IRS:
+            self.FlagsNZ(self.y)
+        else:
+            self.FlagsNZWord(self.y)
 
     @instruction(name="STZ", mode="abs", cycles=4)
     def inst_0x9c(self):
@@ -2142,13 +2166,26 @@ class MPU:
         operand = self.OperandByte()
         mask = self.CARRY
         while mask:
-            # can't change BREAK or UNUSED flags in emulation mode
-            if mask & operand and not (self.mode and (mask & self.BREAK or mask & self.UNUSED)):
-                if mask == self.MS and self.isCLR(self.MS):
-                    # A 8 => 16, set A = b a
-                    self.a = (self.b << self.BYTE_WIDTH) + self.a
-                    self.b = 0
-                self.pCLR(mask)
+#            if mask & operand and not (self.mode and (mask & self.BREAK or mask & self.UNUSED)):
+#                if mask == self.MS and self.isSET(self.MS):
+#                    # A 8 => 16, set A = b a
+#                    self.a = (self.b << self.BYTE_WIDTH) + self.a
+#                    self.b = 0
+#                self.pCLR(mask)
+
+            # *** TODO: consider reworking SEP also to make conditionals clearer ***
+            if mask & operand:
+                if self.mode:
+                    # can't change BREAK or UNUSED flags in emulation mode
+                    if not (mask & self.BREAK or mask & self.UNUSED):
+                        self.pCLR(mask)
+                else:
+                    if mask == self.MS and self.isSET(self.MS):
+                        # A 8 => 16, set A = b a
+                        self.a = (self.b << self.BYTE_WIDTH) + self.a
+                        self.b = 0
+                    self.pCLR(mask)
+
             mask = (mask << 1) & self.byteMask
         self.incPC()
 
@@ -2291,8 +2328,11 @@ class MPU:
 
     @instruction(name="JML", mode="ail", cycles=6)  # new to 65816
     def inst_0xdc(self):
-        self.pbr = self.ByteAt(self.pc + 2)
-        self.pc = self.WordAt(self.OperandWord())
+        addr = self.OperandWord()
+#        self.pbr = self.ByteAt(self.pc + 2)
+#        self.pc = self.WordAt(self.OperandWord())
+        self.pbr = self.ByteAt(addr + 2)
+        self.pc = self.WordAt(addr)
 
     @instruction(name="CMP", mode="abx", cycles=4, extracycles=1)
     def inst_0xdd(self):
