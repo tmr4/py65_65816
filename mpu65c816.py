@@ -189,13 +189,13 @@ class MPU:
         # pc must remain within current program bank
         self.pc = (self.pc + inc) & self.addrMask
 
-    def opBCL(self, x):
+    def bCLR(self, x):
         if self.p & x:
             self.incPC()
         else:
             self.ProgramCounterRelAddr()
 
-    def opBST(self, x):
+    def bSET(self, x):
         if self.p & x:
             self.ProgramCounterRelAddr()
         else:
@@ -258,7 +258,7 @@ class MPU:
         if value == 0:
             self.p |= self.ZERO
         else:
-            self.p |= value & self.NEGATIVE
+            self.p |= (value >> self.BYTE_WIDTH) & self.NEGATIVE
 
     # Addressing modes
 
@@ -1122,7 +1122,7 @@ class MPU:
 
     @instruction(name="BPL", mode="pcr", cycles=2, extracycles=2)
     def inst_0x10(self):
-        self.opBCL(self.NEGATIVE)
+        self.bCLR(self.NEGATIVE)
 
     @instruction(name="ORA", mode="diy", cycles=5, extracycles=1)
     def inst_0x11(self):
@@ -1305,7 +1305,7 @@ class MPU:
 
     @instruction(name="BMI", mode="pcr", cycles=2, extracycles=2)
     def inst_0x30(self):
-        self.opBST(self.NEGATIVE)
+        self.bSET(self.NEGATIVE)
 
     @instruction(name="AND", mode="diy", cycles=5, extracycles=1)
     def inst_0x31(self):
@@ -1493,7 +1493,7 @@ class MPU:
 
     @instruction(name="BVC", mode="pcr", cycles=2, extracycles=2)
     def inst_0x50(self):
-        self.opBCL(self.OVERFLOW)
+        self.bCLR(self.OVERFLOW)
 
     @instruction(name="EOR", mode="diy", cycles=5, extracycles=1)
     def inst_0x51(self):
@@ -1678,7 +1678,7 @@ class MPU:
 
     @instruction(name="BVS", mode="pcr", cycles=2, extracycles=2)
     def inst_0x70(self):
-        self.opBST(self.OVERFLOW)
+        self.bSET(self.OVERFLOW)
 
     @instruction(name="ADC", mode="diy", cycles=5, extracycles=1)
     def inst_0x71(self):
@@ -1868,7 +1868,7 @@ class MPU:
 
     @instruction(name="BCC", mode="pcr", cycles=2, extracycles=2)
     def inst_0x90(self):
-        self.opBCL(self.CARRY)
+        self.bCLR(self.CARRY)
 
     @instruction(name="STA", mode="diy", cycles=6)
     def inst_0x91(self):
@@ -2068,7 +2068,7 @@ class MPU:
 
     @instruction(name="BCS", mode="pcr", cycles=2, extracycles=2)
     def inst_0xb0(self):
-        self.opBST(self.CARRY)
+        self.bSET(self.CARRY)
 
     @instruction(name="LDA", mode="diy", cycles=5, extracycles=1)
     def inst_0xb1(self):
@@ -2265,7 +2265,7 @@ class MPU:
 
     @instruction(name="BNE", mode="pcr", cycles=2, extracycles=2)
     def inst_0xd0(self):
-        self.opBCL(self.ZERO)
+        self.bCLR(self.ZERO)
 
     @instruction(name="CMP", mode="diy", cycles=5, extracycles=1)
     def inst_0xd1(self):
@@ -2462,7 +2462,7 @@ class MPU:
 
     @instruction(name="BEQ", mode="pcr", cycles=2, extracycles=2)
     def inst_0xf0(self):
-        self.opBST(self.ZERO)
+        self.bSET(self.ZERO)
 
     @instruction(name="SBC", mode="diy", cycles=5, extracycles=1)
     def inst_0xf1(self):
