@@ -32,6 +32,10 @@ Additional 65C02 based unit tests for 65C816 emulation mode.
 
 A modified version of Scot W. Stevenson's Liara Forth (https://github.com/scotws/LiaraForth) for testing.  Liara Forth is designed to run on the Western Design Center's W65C265SXB development board (https://www.westerndesigncenter.com/wdc/documentation/W65C265SXB.pdf).  I've modified the Liara Forth binary to interface with alternate I/O addresses rather than those used by the development board.
 
+* `of816_forth.bin`
+
+A compiled binary of [OF816](https://github.com/mgcaret/of816), by Michael Guidero, for the [py65816 platform](https://github.com/tmr4/of816/blob/master/platforms/py65816/).  OF816 provides a more robust test of the simulation as it uses more features and can operate outside bank 0.  This port has the dictionary located in bank 1.
+
 # Modifications to core py65 modules
 
 The following modifications are needed for py65 to simulate the 65C816:
@@ -55,7 +59,7 @@ It wasn't easy to find a sizable program to test with the new 65C816 simulation.
 
 # Testing the 65C816 Simulation with OF816
 
-I ported [OF816](https://github.com/tmr4/of816), another sizable program, to test with the new 65C816 simulation.  OF816 is an attractive test program because it uses many more 65816 features than Liara Forth.  As such I've been able to track down more errors in the simulation.  You can run py65816 version of OF816 with `python monitor.py -m 65c816 -r forth.bin -i 7FC0 -o 7FE0` (TDB load a binary for this after checking license requirements).
+I forked [OF816](https://github.com/mgcaret/of816), by Michael Guidero, and created a new platform for the 65816 on py65, (https://github.com/tmr4/of816/blob/master/platforms/py65816/).  OF816 is another sizable program to test with the new 65C816 simulation.  OF816 is an attractive test program because it uses many more 65816 features than Liara Forth.  As such I've been able to track down more errors in the simulation.  You can run py65816 version of OF816 with `python monitor.py -m 65c816 -r of816_forth.bin -i 7FC0 -o 7FE0`.
 
 # Limitations
 
@@ -64,37 +68,42 @@ I ported [OF816](https://github.com/tmr4/of816), another sizable program, to tes
 * FIXED: ROL and ROR haven't been updated for a 16 bit accumulator.
 * Extra cycle counts haven't been considered for any new to 65816 opcodes.
 * ADC and SBC in decimal mode are likely invalid in 16 bit.
-* Native mode hasn't been tested outside of bank 0.  Assume it will fail for this until it is tested.  Currently only 3 banks of memory are modeled, by py65 default, but this can easily be changed.
+* FIXED: Native mode hasn't been tested outside of bank 0.  Assume it will fail for this until it is tested.  Bank 1 successfully tested with OF816.
+* Currently only 3 banks of memory are modeled, by py65 default, but this can easily be changed.
 * The simulation is meant to emulate the actual W65C816.  Modelling so far has been based on the 65816 Programming Manual only.  I intend to test at least some code against the W65C265SXB development board.
-* Currently no way to break to the py65 monitor.  I've successfully run Liara Forth with a version of my debug window (https://github.com/tmr4/py65_debug_window) without the interrupt code.
+* Currently no way to break to the py65 monitor.  I've successfully run Liara Forth and OF816 with a version of my debug window (https://github.com/tmr4/py65_debug_window) without the interrupt code.
 * Register wrapping of Direct page addressing modes need tested.
 
 2. Liara Forth now runs in py65 with the new 65C816 device, but it hasn't been extensively tested.  Liara Forth runs entirely in bank 0.  There is no way to break to the monitor since Liara Forth was designed to run on hardware only (you can use my debug window with it).  It can only be ended with a control-C.
 
 3. I've successfully run a non-interrupt version of my own 6502 Forth in the new 65C816 device in emulation mode.  This isn't surprising since much of the code comes from py65 6502 and 65C02 devices.  I expect an interrupt version of it will run as well, but I haven't tested this.  I expect that many 6502 programs will run in emulation mode.  Note however, that there are differences between the 65C816 operating in emulation mode and the 6502/65C02 that could cause problems with your program.
 
-4. OF816 now runs in py65 with the new 65C816 device with the py65816 platform.  This also currently runs entirely in bank 0.
+4. OF816 now runs in py65 with the new 65C816 device with the py65816 platform.  I've successfully run a version running entirely in bank 0 and one with the dictionary in bank 1.  Neither has been extensively tested.
 
 # Status
 
 * Initial commit: January 11, 2022
-* Successfully tested my 65C02 Forth in emulation mode
-* Was able to run Liara Forth in native mode in block 0.
-* Was able to start OF816 in native mode in block 0.  
-    * FIXED: Currently input is accepted but not properly interpreted.
-    * FIXED: Numbers aren't interpreted properly, but coded ones (-1, 0, 1, 2, 3) work as expected.
-* Successfully ran 507 unit tests in emulation mode, 506 unit tests in native 8-bit mode and 226 unit tests in native 16-bit mode.
-  * FIXED: (Many words cause it to crash (likely due to one of the limitations listed above).)
-  * FIXED: Currently all numbers print out as 0.  After verifying that Liara Forth works properly on the W65C265SXB development board, using my debug window (https://github.com/tmr4/py65_debug_window) I tracked the issue down to UM* where the high byte in the high cell of the result is zero (for example $1234 * $1234 = $14b5a90 but my 65816 simulation is yielding $04b5a90).  I couldn't find any obvious errors in my code after examining each line code for the Liara Forth UM*.  I'm ending up with a 24 bit value rather than a 32 bit one, so that may give me a clue to what's happening. Update: turns out I was shifting the high byte by the byte mask ($ffff) instead of the byte width ($08)! Oops.
+* As of January 21, 2022:
+    * Successfully tested my 65C02 Forth in emulation mode
+    * Was able to run Liara Forth in native mode in block 0.
+    * FIXED: (Many words cause it to crash (likely due to one of the limitations listed above).)
+    * FIXED: Currently all numbers print out as 0.  After verifying that Liara Forth works properly on the W65C265SXB development board, using my debug window (https://github.com/tmr4/py65_debug_window) I tracked the issue down to UM* where the high byte in the high cell of the result is zero (for example $1234 * $1234 = $14b5a90 but my 65816 simulation is yielding $04b5a90).  I couldn't find any obvious errors in my code after examining each line code for the Liara Forth UM*.  I'm ending up with a 24 bit value rather than a 32 bit one, so that may give me a clue to what's happening. Update: turns out I was shifting the high byte by the byte mask ($ffff) instead of the byte width ($08)! Oops.
+    * Was able to start OF816 in native mode in bank 0 and with the dictionary in bank 1.  
+        * FIXED: Currently input is accepted but not properly interpreted.
+        * FIXED: Numbers aren't interpreted properly, but coded ones (-1, 0, 1, 2, 3) work as expected.
+    * Successfully ran 507 unit tests in emulation mode, 506 unit tests in native 8-bit mode and 226 unit tests in native 16-bit mode.
 
 # Next Steps
 
 * COMPLETED: Resolve simulator issues with running Liara Forth.  I view this as a robust test of the 65816 simulator, other than bank switching, which Liara Forth doesn't handle out of the box.  Some hardware specific Liara Forth features will not work with the simulator (KEY? for example which is hardwired to a W65C265SXB development board specific address indicating whether a key has been pressed).
+* COMPLETE: I ported [OF816](https://github.com/tmr4/of816) to get another test program.  Working in bank 0 and with the dictionary in bank 1 as in the [W65C816SXB platform](https://github.com/tmr4/of816/blob/master/platforms/W65C816SXB/W65C816SXB.s).
+    * Older entries:
+        * The port starts properly in py65 but input is not yet properly interpreted by the system.  Tracking the error is made more difficult in that much of the program is coded in Forth, making it more difficult to debug in py65.
+        * With this I fixed several errors with several instructions, mainly those involving long address modes, but also the TSB TRB REP JML instructions.  Still a problem with number input (FIXED: I had neglected to properly calculated the negative flag when dealing with s 16 bit accumulator).  With some clever breakpoint setting, it is easier to debug once you understand the program.
 * Add native mode unit tests.
   * Native mode, 8-bit tests: In progress. Added 506 unit tests modified from the emulation mode tests.
   * Native mode, 16-bit and mixed-bit tests: Just going with brut force.  226 unit tests added so far for ADC AND ASL BIT CMP CPX CPY DEC DEX DEY SBC.  These have already proven their worth by pointing out a problem with how I calculated the overflow flag in ADC.  Still the going is slow.  
     * Older entry: Still looking for an easy way to do this.  All of the 65816 testing frameworks I've found so far require an amount of conversion almost equal to modifying the emulation mode tests for native mode.
-* I ported [OF816](https://github.com/tmr4/of816) to get another test program.  Working in bank 0.  Need to test with the dictionary in bank 1 as in the [W65C816SXB platform](https://github.com/tmr4/of816/blob/master/platforms/W65C816SXB/W65C816SXB.s).
-    * Older entries:
-        * The port starts properly in py65 but input is not yet properly interpreted by the system.  Tracking the error is made more difficult in that much of the program is coded in Forth, making it more difficult to debug in py65.
-        * With this I fixed several errors with several instructions, mainly those involving long address modes, but also the TSB TRB REP JML instructions.  Still a problem with number input (FIXED: I had neglected to properly calculated the negative flag when dealing with s 16 bit accumulator).  With some clever breakpoint setting, it is easier to debug once you understand the program.
+
+* As of January 21, 2022:
+    * I'll probably continue updates to the simulation as I work on my hardware build.  I expect the simulation to be functional, having run several large programs successfully.  However, as noted above, much work remains.  I'll continue to add unit tests from time to time but this isn't a high priority for me right now.
