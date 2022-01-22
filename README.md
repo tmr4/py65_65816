@@ -10,7 +10,7 @@ This repository provides a framework for adding support for the 65C816 to py65. 
 
 # Contents
 
-I've included the main device module, `mpu65c816.py`, to add simulation support for the 65C816 to py65.  I've also include several modules for testing the 65C816 simulation.  These include the main unit test module, `test_mpu65c816.py`, and support modules, `test_mpu65816_Common6502.py` and `test_mpu65816_Common65c02.py`, derived largely from similarly named py65 test modules, to test the 65C816 emulation mode simulation.  I've also included a binary file, `liara.bin`, that I modified from Scot W. Stevenson's Liara Forth (https://github.com/scotws/LiaraForth) to work with py65 simulating the 65C816.  Note that I'm a Python newbie and appreciate any feedback to make these better.
+I've included the main device module, `mpu65c816.py`, to add simulation support for the 65C816 to py65.  I've also include several modules for testing the 65C816 simulation.  So far these have been derived largely from similarly named py65 test modules.  I've also included two binary files, `liara.bin` and `of816_forth.bin`.  I modified the former from Scot W. Stevenson's Liara Forth (https://github.com/scotws/LiaraForth) to work with py65 simulating the 65C816.  The later is a port for py65 of Michael Guidero's OF816 (https://github.com/mgcaret/of816).  Note that I'm a Python newbie and appreciate any feedback to make these better.
 
 * `mpu65c816.py`
 
