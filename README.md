@@ -1,3 +1,7 @@
+# Status as of January 25, 2022
+
+Now that I've learned a bit more Python, I've decided to create a package that works on top of py65 rather than modifies it.  That let's you add the 65816 simulation while maintaining your py65 installation intact.  See [py65816](https://github.com/tmr4/py65816) for a version with my debug window.  This is where I'll be making future updates to the 65816 simulation.
+
 # Add support for the 65C816 to py65
 
 Py65 (https://github.com/mnaberez/py65) is a great simulator for the 6502.  Recently I added support for interrupts (https://github.com/tmr4/py65_int) and a debug window (https://github.com/tmr4/py65_debug_window).  After success with these modifications, I decided to try adding support for the 65C816. Luckily, py65 is open-source and enhancing it isn't very difficult.
